@@ -28,6 +28,8 @@ export interface DialogSelectProps<T> {
   titleView?: JSX.Element
   /** Faint line below the title, under the "new-designs" experiment. Not shown with `searchInTitle`. */
   description?: string
+  /** Blank rows above the footer under the "new-designs" experiment. Defaults to 1. */
+  footerGap?: number
   placeholder?: string
   footer?: JSX.Element
   emptyView?: JSX.Element
@@ -101,6 +103,8 @@ export interface DialogSelectOption<T = any> {
   details?: string[]
   footer?: JSX.Element | string
   footerColor?: RGBA
+  /** Cells the footer extends into the row's right padding, e.g. 2 for a `DialogSelectChoice` so its value lines up with plain footers. */
+  footerOverhang?: number
   titleWidth?: number
   truncateTitle?: boolean | "left"
   category?: string
@@ -678,6 +682,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
 
   return (
     <DialogLayout
+      footerGap={props.footerGap}
       header={
         // Rows reserve a gutter, so the header and footer line up with the list's inset rather than the layout's.
         <box paddingLeft={DIALOG_LIST_INSET - DIALOG_INSET} paddingRight={DIALOG_LIST_INSET - DIALOG_INSET}>
@@ -801,6 +806,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                               flatten() ? (option.searchFooter ?? option.category ?? option.footer) : option.footer
                             }
                             footerColor={option.footerColor}
+                            footerOverhang={option.footerOverhang}
                             titleWidth={option.titleWidth}
                             truncateTitle={option.truncateTitle}
                             description={option.description !== category ? option.description : undefined}
@@ -847,6 +853,20 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   )
 }
 
+/**
+ * Trailing value of a row that can be changed, under the "new-designs" experiment. The selected row shows how:
+ * `‹ dark ›` cycles with ←/→, `opencode ↵` opens a picker. Other rows pad the value to the same width so it does
+ * not shift as the selection moves. Pass it with `footerOverhang: 2` so the value itself ends where plain footers do.
+ */
+export function DialogSelectChoice(props: { value: string; active: boolean; open?: boolean }) {
+  const theme = useTheme().surface("dialog")
+  const text = () => {
+    if (!props.active) return `  ${props.value}  `
+    return props.open ? `  ${props.value} ↵` : `‹ ${props.value} ›`
+  }
+  return <span style={{ fg: props.active ? theme.text.action.primary.focused : theme.text.faint }}>{text()}</span>
+}
+
 function DialogSelectCategory(props: { title: string; first: boolean }) {
   const theme = useTheme().surface("dialog")
   const newDesigns = useNewDesigns()
@@ -867,6 +887,7 @@ function DialogSelectRow(props: {
   current: boolean
   footer?: JSX.Element | string
   footerColor?: RGBA
+  footerOverhang?: number
   titleWidth?: number
   truncateTitle?: boolean | "left"
   gutter?: (color: RGBA) => JSX.Element
@@ -932,7 +953,7 @@ function DialogSelectRow(props: {
         </Show>
       </text>
       <Show when={props.footer}>
-        <box flexShrink={0}>
+        <box flexShrink={0} marginRight={props.footerOverhang ? -props.footerOverhang : undefined}>
           <text fg={props.active || !props.footerColor ? secondary() : props.footerColor}>{props.footer}</text>
         </box>
       </Show>
