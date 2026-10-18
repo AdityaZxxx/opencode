@@ -760,6 +760,7 @@ export const dict = {
   "project.settings.icon.description": "Recommended: 128×128px. Click or drag to upload an image.",
   "project.settings.icon.detected.title": "Detected icons",
   "project.settings.icon.detected.description": "Images found in this project.",
+  "project.settings.icon.automatic": "Use automatic icon",
   "project.settings.color.description": "Used for the project icon when no custom image is set",
   "project.settings.worktree.startup.description": "Runs once after creating a new worktree",
   "project.settings.worktree.startup.hint.base": "Use $OPENCODE_WORKTREE_BASE for the base worktree.",

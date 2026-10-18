@@ -15,13 +15,15 @@ export function createEditProjectModel(props: { project: LocalProject; server: S
   const language = useLanguage()
   const global = useGlobal()
   const serverCtx = createMemo(() => global.ensureServerCtx(props.server))
+
   const icons = useQuery(() => ({
     queryKey: [serverCtx().sdk.scope, props.project.worktree, "project-icons"] as const,
     queryFn: ({ signal }) =>
       serverCtx().sdk.api.project.icons({ location: { directory: props.project.worktree } }, { signal }),
   }))
-  const folderName = createMemo(() => getFilename(props.project.worktree))
-  const defaultName = createMemo(() => props.project.name || folderName())
+
+  const automaticName = createMemo(() => props.project.repository || getFilename(props.project.worktree))
+  const defaultName = createMemo(() => props.project.name || automaticName())
 
   const [store, setStore] = createStore({
     name: defaultName(),
@@ -68,7 +70,7 @@ export function createEditProjectModel(props: { project: LocalProject; server: S
   }
 
   const saveName = () => {
-    const value = store.name.trim() === folderName() ? "" : store.name.trim()
+    const value = store.name.trim() === automaticName() ? "" : store.name.trim()
 
     // A pending write can change the saved value, so reverting to it must still be queued.
     if (!store.saving && value === saved.name) return
@@ -112,11 +114,16 @@ export function createEditProjectModel(props: { project: LocalProject; server: S
   return {
     store,
     setStore,
-    folderName,
+    automaticName,
     defaultName,
     icons,
     saveName,
     saveStartup,
+    selectAutomaticIcon() {
+      setStore("iconOverride", "")
+      setStore("color", undefined)
+      saveIcon(undefined, "")
+    },
     selectIcon(url: string) {
       setStore("iconOverride", url)
       saveIcon(store.color, url)
