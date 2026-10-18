@@ -52,7 +52,7 @@ test("exposes every standard HTTP API group", () => {
   expect(Object.keys(client.experimental)).toEqual(["persistentPty"])
   expect(client.experimental.persistentPty.read).toBeFunction()
   expect(Object.keys(client.shell)).toEqual(["list", "create", "get", "output", "remove"])
-  expect(Object.keys(client.project)).toEqual(["list", "icons", "update"])
+  expect(Object.keys(client.project)).toEqual(["list", "icons", "icon", "update"])
   expect(Object.keys(client.worktree)).toEqual(["list", "create", "remove", "refresh"])
 })
 

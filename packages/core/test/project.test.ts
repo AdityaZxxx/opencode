@@ -73,48 +73,105 @@ describe("Project.list", () => {
 })
 
 describe("Project.icons", () => {
-  it.live("discovers supported favicons ordered by relative path length and name", () =>
+  it.live("lists ranked icon candidates as data URLs", () =>
     Effect.gen(function* () {
       const tmp = yield* Effect.acquireRelease(
         Effect.promise(() => tmpdir()),
         (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
       )
       yield* Effect.promise(async () => {
-        await fs.mkdir(path.join(tmp.path, "a"))
-        await fs.mkdir(path.join(tmp.path, "b"))
-        await fs.mkdir(path.join(tmp.path, "nested", "app"), { recursive: true })
-        await Bun.write(path.join(tmp.path, "favicon.ico"), "ico")
-        await Bun.write(path.join(tmp.path, "favicon.png"), "png")
-        await Bun.write(path.join(tmp.path, "a", "favicon.svg"), "<svg />")
-        await Bun.write(path.join(tmp.path, "b", "favicon.jpg"), "jpg")
-        await Bun.write(path.join(tmp.path, "nested", "app", "favicon.jpeg"), "jpeg")
-        await Bun.write(path.join(tmp.path, "nested", "app", "favicon.webp"), "webp")
-        await Bun.write(path.join(tmp.path, "nested", "app", "favicon.gif"), "gif")
-        await Bun.write(path.join(tmp.path, "nested", "app", "icon.png"), "icon")
+        await Bun.write(path.join(tmp.path, "public", "favicon.ico"), "ico")
+        await Bun.write(path.join(tmp.path, "public", "favicon.svg"), "<svg />")
+        await Bun.write(path.join(tmp.path, "assets", "logo.webp"), "webp")
+        await Bun.write(path.join(tmp.path, "src", "photo.png"), "png")
       })
       const project = yield* Project.Service
 
       expect(yield* project.icons(abs(tmp.path))).toEqual([
-        { path: RelativePath.make("favicon.ico"), url: "data:image/vnd.microsoft.icon;base64,aWNv" },
-        { path: RelativePath.make("favicon.png"), url: "data:image/png;base64,cG5n" },
-        { path: RelativePath.make("a/favicon.svg"), url: "data:image/svg+xml;base64,PHN2ZyAvPg==" },
-        { path: RelativePath.make("b/favicon.jpg"), url: "data:image/jpeg;base64,anBn" },
-        { path: RelativePath.make("nested/app/favicon.jpeg"), url: "data:image/jpeg;base64,anBlZw==" },
-        { path: RelativePath.make("nested/app/favicon.webp"), url: "data:image/webp;base64,d2VicA==" },
+        { path: RelativePath.make("public/favicon.svg"), url: "data:image/svg+xml;base64,PHN2ZyAvPg==" },
+        { path: RelativePath.make("public/favicon.ico"), url: "data:image/x-icon;base64,aWNv" },
+        { path: RelativePath.make("assets/logo.webp"), url: "data:image/webp;base64,d2VicA==" },
       ])
     }),
   )
 
-  it.live("returns no candidates when the worktree has no favicons", () =>
+  it.live("returns no candidates when the worktree has no icons", () =>
     Effect.gen(function* () {
       const tmp = yield* Effect.acquireRelease(
         Effect.promise(() => tmpdir()),
         (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
       )
-      yield* Effect.promise(() => Bun.write(path.join(tmp.path, "icon.png"), "icon"))
+      yield* Effect.promise(() => Bun.write(path.join(tmp.path, "src", "icon.png"), "icon"))
       const project = yield* Project.Service
 
       expect(yield* project.icons(abs(tmp.path))).toEqual([])
+    }),
+  )
+})
+
+describe("Project automatic identity", () => {
+  it.live("names a git project after its remote and serves its discovered icon", () =>
+    Effect.gen(function* () {
+      const tmp = yield* Effect.acquireRelease(
+        Effect.promise(() => tmpdir()),
+        (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
+      )
+      const checkout = path.join(tmp.path, "rewrite")
+      yield* Effect.promise(async () => {
+        await Bun.write(path.join(checkout, "public", "favicon.svg"), "<svg />")
+        await initRepo(checkout, { commit: true, remote: "git@github.com:acme/team-board.git" })
+      })
+      const project = yield* Project.Service
+
+      const resolved = yield* project.resolve(abs(checkout))
+      yield* project.refreshIcons()
+      const image = yield* project.icon(resolved.id)
+      const info = (yield* project.list()).find((item) => item.id === resolved.id)
+
+      expect(image?.type).toBe("image/svg+xml")
+      expect(new TextDecoder().decode(image?.bytes)).toBe("<svg />")
+      expect(info?.name).toBeUndefined()
+      expect(info?.repository).toBe("team-board")
+      expect(info?.icon).toEqual({
+        discovered: {
+          url: `/api/project/${resolved.id}/icon?v=${image?.hash}`,
+          path: RelativePath.make("public/favicon.svg"),
+        },
+      })
+    }),
+  )
+
+  it.live("keeps user icon choices when discovery runs and after they are cleared", () =>
+    Effect.gen(function* () {
+      const tmp = yield* Effect.acquireRelease(
+        Effect.promise(() => tmpdir()),
+        (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
+      )
+      yield* Effect.promise(() => Bun.write(path.join(tmp.path, "favicon.svg"), "<svg />"))
+      const db = (yield* Database.Service).db
+      const project = yield* Project.Service
+      const id = Project.ID.make("chosen")
+      yield* db
+        .insert(ProjectTable)
+        .values({
+          id,
+          worktree: abs(tmp.path),
+          name: "Chosen",
+          icon_url_override: "data:image/png;base64,AA==",
+          icon_color: "blue",
+          sandboxes: [],
+        })
+        .run()
+
+      yield* project.refreshIcons()
+      const chosen = (yield* project.list()).find((item) => item.id === id)
+      const cleared = yield* project.update({ projectID: id, icon: { override: "", color: "" } })
+
+      expect(chosen?.name).toBe("Chosen")
+      expect(chosen?.icon).toMatchObject({ override: "data:image/png;base64,AA==", color: "blue" })
+      expect(chosen?.icon?.discovered?.path).toBe(RelativePath.make("favicon.svg"))
+      expect(cleared.icon?.override).toBeUndefined()
+      expect(cleared.icon?.discovered).toEqual(chosen?.icon?.discovered)
     }),
   )
 })

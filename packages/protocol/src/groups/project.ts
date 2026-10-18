@@ -1,7 +1,7 @@
 import { Project } from "@opencode/schema/project"
 import { Schema, SchemaGetter, Struct } from "effect"
-import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/http-api"
-import { ProjectNotFoundError } from "../errors.js"
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/http-api"
+import { FileNotFoundError, ProjectNotFoundError } from "../errors.js"
 import { LocationQuery, locationQueryOpenApi } from "./location.js"
 
 const root = "/api/project"
@@ -39,6 +39,25 @@ export const ProjectGroup = HttpApiGroup.make("server.project")
           description: "Discover favicon candidates in the requested project worktree.",
         }),
       ),
+  )
+  .add(
+    HttpApiEndpoint.get("project.icon", Project.iconRoute, {
+      params: { projectID: Project.ID },
+      query: Schema.Struct({
+        v: Schema.String.pipe(Schema.optional).annotate({
+          description: "Content hash from `icon.discovered.url`. A matching version is cacheable indefinitely.",
+        }),
+      }),
+      success: Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array()),
+      error: [ProjectNotFoundError, FileNotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "project.icon",
+        summary: "Get project icon",
+        description:
+          "Serve the image bytes of the icon discovered in the project, with an ETag of its content hash. Responds 404 when the project has no discovered icon file.",
+      }),
+    ),
   )
   .add(
     HttpApiEndpoint.patch("project.update", `${root}/:projectID`, {
