@@ -4,10 +4,11 @@ import { Context, Duration, Effect, Layer, Schedule, Schema } from "effect"
 import { ChildProcess } from "effect/process"
 import { and, asc, desc, eq, gte, isNotNull, isNull, lt, lte, ne, sql } from "drizzle-orm"
 import path from "path"
-import { AbsolutePath } from "./schema.js"
+import { AbsolutePath, RelativePath } from "./schema.js"
 import { Bus } from "./bus.js"
 import { Database } from "./database/database.js"
 import { Worktree } from "@opencode/schema/worktree"
+import type { IconCandidate } from "@opencode/schema/project"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Git } from "./git.js"
 import { AppProcess } from "@opencode/util/process"
@@ -67,6 +68,7 @@ export interface ListInput {
 
 export interface Interface {
   readonly list: (input?: ListInput) => Effect.Effect<ReadonlyArray<Info>>
+  readonly icons: (directory: AbsolutePath) => Effect.Effect<ReadonlyArray<IconCandidate>>
   readonly update: (input: UpdateInput) => Effect.Effect<Info, NotFoundError>
   /** Records Project activity for recency ordering, at most once per minute per Project. */
   readonly activate: (projectID: ID) => Effect.Effect<void>
@@ -227,6 +229,23 @@ const layer = Layer.effect(
         .all()
         .pipe(Effect.orDie)
       return rows.map(fromRow)
+    })
+
+    const icons = Effect.fn("Project.icons")(function* (directory: AbsolutePath) {
+      const files = yield* fs
+        .scan("**/favicon.{ico,png,svg,jpg,jpeg,webp}", { cwd: directory, include: "file" })
+        .pipe(Effect.orDie)
+      return yield* Effect.forEach(
+        files.toSorted((a, b) => a.length - b.length || a.localeCompare(b)),
+        (file) =>
+          fs.readFile(path.join(directory, file)).pipe(
+            Effect.orDie,
+            Effect.map((content) => ({
+              path: RelativePath.make(file.replaceAll("\\", "/")),
+              url: `data:${FSUtil.mimeType(file)};base64,${Buffer.from(content).toString("base64")}`,
+            })),
+          ),
+      )
     })
 
     const update = Effect.fn("Project.update")(function* (input: UpdateInput) {
@@ -442,7 +461,7 @@ const layer = Layer.effect(
       )
     })
 
-    return Service.of({ list, update, activate, resolve, sweep })
+    return Service.of({ list, icons, update, activate, resolve, sweep })
   }),
 )
 

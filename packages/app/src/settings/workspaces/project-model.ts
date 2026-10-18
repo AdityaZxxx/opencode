@@ -1,5 +1,6 @@
 import { getFilename } from "@opencode/util/path"
 import type { ProjectUpdateInput } from "@opencode/client/promise"
+import { useQuery } from "@tanstack/solid-query"
 import { createMemo } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useGlobal } from "@/runtime/server/runtime"
@@ -14,6 +15,11 @@ export function createEditProjectModel(props: { project: LocalProject; server: S
   const language = useLanguage()
   const global = useGlobal()
   const serverCtx = createMemo(() => global.ensureServerCtx(props.server))
+  const icons = useQuery(() => ({
+    queryKey: [serverCtx().sdk.scope, props.project.worktree, "project-icons"] as const,
+    queryFn: ({ signal }) =>
+      serverCtx().sdk.api.project.icons({ location: { directory: props.project.worktree } }, { signal }),
+  }))
   const folderName = createMemo(() => getFilename(props.project.worktree))
   const defaultName = createMemo(() => props.project.name || folderName())
 
@@ -108,8 +114,13 @@ export function createEditProjectModel(props: { project: LocalProject; server: S
     setStore,
     folderName,
     defaultName,
+    icons,
     saveName,
     saveStartup,
+    selectIcon(url: string) {
+      setStore("iconOverride", url)
+      saveIcon(store.color, url)
+    },
     setColor(value: string | undefined) {
       setStore("color", value)
       saveIcon(value, store.iconOverride)
