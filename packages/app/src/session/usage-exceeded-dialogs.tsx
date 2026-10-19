@@ -1,8 +1,7 @@
 import { useWorkspaceLocation } from "@/workspaces/location"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import type { SessionStatus, SessionStepFailed } from "@opencode/client/promise"
-import { onCleanup } from "solid-js"
-import { createStore } from "solid-js/store"
+import { createSignal, onCleanup } from "solid-js"
 import { Schema } from "effect"
 import { Persistence } from "@/runtime/persistence/schema"
 import { useSessionLayout } from "./session-layout"
@@ -20,6 +19,8 @@ const GO_UPSELL_ACCOUNT_RATE_LIMIT_DONT_SHOW = "go_upsell_account_rate_limit_don
 const GO_UPSELL_WINDOW = 86_400_000 // 24 hrs
 
 const GO_UPSELL_PROVIDERS = new Set(["opencode", "opencode-go"])
+
+const GO_URL = "https://opencode.ai/go"
 
 const CHATGPT_USAGE_LIMIT_WINDOW = 86_400_000 // 24 hrs
 
@@ -65,8 +66,8 @@ export function useUsageExceededDialogs() {
   const dialog = useDialog()
   const { params } = useSessionLayout()
   const i18n = useI18n()
-  // Failed steps whose free usage limit the dialog explained, keyed by assistant message ID.
-  const [explained, setExplained] = createStore<Record<string, true>>({})
+  // The assistant message whose free usage limit the open dialog is explaining.
+  const [explaining, setExplaining] = createSignal<string>()
 
   const [goUpsellState, setGoUpsellState] = persisted(Persist.global("go-upsell"), GoUpsellState, {
     [GO_UPSELL_FREE_TIER_LAST_SEEN_AT]: null,
@@ -112,28 +113,32 @@ export function useUsageExceededDialogs() {
 
       // Counted when shown, so dismissing with Escape or the backdrop also waits out the window.
       setGoUpsellState(GO_UPSELL_FREE_TIER_LAST_SEEN_AT, Date.now())
-      setExplained(evt.data.assistantMessageID, true)
+      setExplaining(evt.data.assistantMessageID)
 
       const reset =
         error.retryAfterMs === undefined
           ? undefined
           : new Intl.DateTimeFormat(i18n.locale(), { timeStyle: "short" }).format(Date.now() + error.retryAfterMs)
 
-      dialog.show(() => (
-        <DialogUsageExceeded
-          title={i18n.t("dialog.usageExceeded.freeTier.title")}
-          description={
-            reset
-              ? i18n.t("dialog.usageExceeded.freeTier.descriptionReset", { time: reset })
-              : i18n.t("dialog.usageExceeded.freeTier.description")
-          }
-          actionLabel={i18n.t("dialog.usageExceeded.freeTier.actionLabel")}
-          onClose={(dontShowAgain) => {
-            if (dontShowAgain) setGoUpsellState(GO_UPSELL_FREE_TIER_DONT_SHOW, Date.now())
-            else showGoConnect(dialog, sdk().directory)
-          }}
-        />
-      ))
+      dialog.show(
+        () => (
+          <DialogUsageExceeded
+            title={i18n.t("dialog.usageExceeded.freeTier.title")}
+            description={
+              reset
+                ? i18n.t("dialog.usageExceeded.freeTier.descriptionReset", { time: reset })
+                : i18n.t("dialog.usageExceeded.freeTier.description")
+            }
+            actionLabel={i18n.t("dialog.usageExceeded.freeTier.actionLabel")}
+            link={GO_URL}
+            onClose={(dontShowAgain) => {
+              if (dontShowAgain) setGoUpsellState(GO_UPSELL_FREE_TIER_DONT_SHOW, Date.now())
+              else showGoConnect(dialog, sdk().directory)
+            }}
+          />
+        ),
+        () => setExplaining(undefined),
+      )
     }),
   )
 
@@ -175,7 +180,7 @@ export function useUsageExceededDialogs() {
   )
 
   return {
-    /** Whether the free usage limit dialog already explained this failed step. */
-    freeLimitExplained: (messageID: string) => explained[messageID] === true,
+    /** Whether the free usage limit dialog is open over this failed step. */
+    freeLimitDialogOpen: (messageID: string) => explaining() === messageID,
   }
 }

@@ -41,7 +41,7 @@ export function createActiveSessionRegion(input: {
   timeline: SessionTimelineInteraction
   region: Region
   visible: Accessor<boolean>
-  freeLimitExplained: (messageID: string) => boolean
+  freeLimitDialogOpen: (messageID: string) => boolean
 }) {
   const command = useCommand()
   const data = useData()
@@ -196,7 +196,7 @@ export function createActiveSessionRegion(input: {
     upgrade: () => showGoConnect(dialog, location().directory),
     chooseModel: () => command.trigger("model.choose"),
     connectProvider: () => command.trigger("provider.connect"),
-    explained: input.freeLimitExplained,
+    dialogOpen: input.freeLimitDialogOpen,
   }
 
   // The free allowance stops a prompt after it was sent. Hand its text back so switching models and resending is one

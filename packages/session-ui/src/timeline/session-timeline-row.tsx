@@ -1032,7 +1032,7 @@ export function createSessionTimelineRowRenderer(input: {
             {(actions) => (
               <SessionFreeLimit
                 resetAt={current().resetAt}
-                quiet={actions().explained(current().messageID ?? "")}
+                quiet={actions().dialogOpen(current().messageID ?? "")}
                 actions={actions()}
               />
             )}

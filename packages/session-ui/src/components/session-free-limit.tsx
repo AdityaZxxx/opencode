@@ -7,7 +7,7 @@ const DAY = 86_400_000
 
 /**
  * OpenCode's free daily allowance ran out: an expected limit with ways forward, not a failure. `quiet` keeps a single
- * line for history when a dialog already offered the ways forward.
+ * line while a dialog offers the ways forward.
  */
 export function SessionFreeLimit(props: {
   resetAt?: number

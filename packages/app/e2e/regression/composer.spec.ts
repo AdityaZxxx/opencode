@@ -4,7 +4,7 @@ import { openDraft, openSession } from "../utils/workspace"
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] })
 
-test("the free usage limit explains itself once, then offers ways forward inline", async ({ page }) => {
+test("the free usage limit opens a dialog once, then offers ways forward inline", async ({ page }) => {
   const sessionID = "ses_free_limit"
   const model = { id: "big-pickle", providerID: "opencode" }
 
@@ -51,7 +51,9 @@ test("the free usage limit explains itself once, then offers ways forward inline
   await expect(page.getByText("Free usage limit reached.")).toHaveCount(0)
   await upsell.getByRole("button", { name: "Don't show again", exact: true }).click()
   await expect(upsell).toHaveCount(0)
+  // Once the dialog is gone, the transcript offers the ways forward itself.
   const notice = page.getByRole("status").filter({ hasText: "You've used today's free messages" })
+  await expect(notice.getByRole("button", { name: "Upgrade to Go", exact: true })).toBeVisible()
 
   await view.push([
     {

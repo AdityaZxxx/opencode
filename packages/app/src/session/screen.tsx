@@ -224,7 +224,7 @@ function SessionScreenContent(props: {
     timeline,
     region,
     visible: conversationVisible,
-    freeLimitExplained: usageExceeded.freeLimitExplained,
+    freeLimitDialogOpen: usageExceeded.freeLimitDialogOpen,
   })
 
   props.bindBackground(composer.requests.background.tasks)

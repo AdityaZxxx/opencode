@@ -42,7 +42,7 @@ export type SessionUserActions = {
     upgrade: () => void
     chooseModel: () => void
     connectProvider: () => void
-    /** Whether a dialog already explained this failed step (by assistant message ID), so the transcript keeps one line. */
-    explained: (messageID: string) => boolean
+    /** Whether a dialog is explaining this failed step (by message ID) right now, so the transcript keeps one line. */
+    dialogOpen: (messageID: string) => boolean
   }
 }
