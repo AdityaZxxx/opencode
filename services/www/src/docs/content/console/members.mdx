@@ -59,9 +59,44 @@ You can only grant roles up to your own, and the workspace always keeps at least
 Access is revoked immediately, and you can invite them again later. Their past usage stays in the workspace's reports.
 
 Service accounts and their API keys belong to the workspace, so removing the member who created them does not revoke
-them. Revoke keys from **Keys** if needed. See [Service accounts](/console/api#service-accounts).
+them. Revoke keys from **Keys** if needed. See [Service accounts](#service-accounts).
 
 ## Member details
 
 Click a member to see their monthly budget, models and clients they use, usage charts, and request logs. From here
 you can set their [budget](/console/budgets#member-budgets) and export their usage as CSV.
+
+## Service accounts
+
+Integrations authenticate with a service account: a non-human member of the workspace with its own API keys, usage,
+and [budget](/console/budgets#service-account-budgets). Owners and admins manage them from **Keys**.
+
+1. Open **Keys** and click **Add Service Account**, then name it, for example `CI Pipeline`.
+2. Open the service account and click **Add API Key**.
+3. Choose a **Key name**, **Permissions**, and an optional **Expiry date**, then click **Create key**.
+4. Copy the key. It is shown only once.
+
+```text
+oc_sk_1a2b3c4d5e6f_...
+```
+
+Send the key as a bearer token. It is bound to one workspace, so no workspace header is needed.
+
+```text
+Authorization: Bearer oc_sk_...
+```
+
+### Permissions
+
+| Permission     | Allows                                                                                                    |
+| -------------- | --------------------------------------------------------------------------------------------------------- |
+| Inference only | [Models](/console/api/models) and [Providers](/console/api/providers) requests, and `GET /api/v2/config`. |
+| All            | Everything above, plus the Console API with admin access, except managing models.                         |
+
+Some actions always require a person signed in to the Console, even with an **All** key: inviting members, changing
+roles, removing members, and creating or revoking keys.
+
+### Revoke keys
+
+Open the service account and revoke a key from **API Keys**. Removing the service account revokes all its keys.
+Automations using a revoked or expired key get HTTP `401` immediately.
