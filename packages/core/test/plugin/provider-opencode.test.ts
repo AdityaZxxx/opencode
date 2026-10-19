@@ -138,7 +138,7 @@ describe("OpencodePlugin", () => {
         {
           id: Integration.MethodID.make("device"),
           type: "oauth",
-          label: "OpenCode Console account",
+          label: "Sign in with your OpenCode account",
           form: [
             { key: "server", type: "string", format: "uri", hidden: true, default: "https://opencode.ai/console" },
           ],
@@ -149,12 +149,12 @@ describe("OpencodePlugin", () => {
         {
           id: Integration.MethodID.make("device"),
           type: "oauth",
-          label: "OpenCode Console account",
+          label: "Sign in with your OpenCode account",
           form: [
             { key: "server", type: "string", format: "uri", hidden: true, default: "https://opencode.ai/console" },
           ],
         },
-        { type: "key", label: "API key" },
+        { type: "key", label: "Use an API key" },
       ])
     }),
   )

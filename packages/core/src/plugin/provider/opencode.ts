@@ -111,7 +111,7 @@ function oauth(http: HttpClient.HttpClient, integrationID = consoleIntegrationID
     method: {
       id: methodID,
       type: "oauth",
-      label: "OpenCode Console account",
+      label: "Sign in with your OpenCode account",
       form: [
         {
           key: "server",
@@ -293,7 +293,7 @@ export const OpencodePlugin = define<HttpClient.HttpClient | Bus.Service | Manag
         integration.name = "OpenCode Go"
       })
       editor.method.update(oauth(http, goIntegrationID))
-      editor.method.update({ integrationID: goIntegrationID, method: { type: "key", label: "API key" } })
+      editor.method.update({ integrationID: goIntegrationID, method: { type: "key", label: "Use an API key" } })
     })
 
     snapshot = yield* load()
