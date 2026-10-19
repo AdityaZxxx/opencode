@@ -1453,7 +1453,7 @@ describe("current session timeline rows", () => {
     )
   })
 
-  test("marks the free usage limit with its reset time, whichever message records the failure", () => {
+  test("marks the free usage limit with its failed message and reset time, whichever message records the failure", () => {
     const error = { type: "provider.free-limit", message: "Free usage limit reached.", retryAfterMs: 60_000 }
     const user = { id: "msg_user", type: "user", text: "prompt", time: { created: 1 } } satisfies SessionMessageInfo
 
@@ -1485,11 +1485,13 @@ describe("current session timeline rows", () => {
         userMessageID: "msg_user",
         text: "Free usage limit reached.",
         kind: "free-limit",
+        messageID: "msg_assistant",
         resetAt: 61_000,
       }),
     )
     expect(Timeline.constructSessionMessageRows(idle, true, { type: "idle" }).rows.at(-1)).toMatchObject({
       kind: "free-limit",
+      messageID: "msg_idle",
       resetAt: 62_000,
     })
     expect(Timeline.constructSessionMessageRows(quota, true, { type: "idle" }).rows.at(-1)).toEqual(

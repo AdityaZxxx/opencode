@@ -1701,7 +1701,7 @@ test("server plugin failures share one notice and use source names before an ID 
   expect(setup.captureCharFrame()).toContain("Open plugins")
 })
 
-test("free usage limit shows next steps and hands the prompt back", async () => {
+test("free usage limit opens OpenCode Go once, lists next steps and hands the prompt back", async () => {
   await using state = await tmpdir()
   const session = {
     id: "ses_free_limit",
@@ -1727,6 +1727,11 @@ test("free usage limit shows next steps and hands the prompt back", async () => 
     fetch: (url) => {
       if (url.pathname === "/api/session") return json({ data: [session], cursor: {} })
       if (url.pathname === `/api/session/${session.id}`) return json({ data: session })
+      if (url.pathname === "/api/integration")
+        return json({
+          location: { directory, project: { id: "proj_test", directory, canonical: directory } },
+          data: [{ id: "opencode-go", name: "OpenCode Go", methods: [{ type: "key" }], connections: [] }],
+        })
       if (url.pathname === `/api/session/${session.id}/message`)
         return json({
           data: [
@@ -1750,20 +1755,41 @@ test("free usage limit shows next steps and hands the prompt back", async () => 
   await setup.ready
   await setup.waitForFrame((frame) => frame.includes("Refactor the parser"))
   setup.events.emit({
-    id: "evt_free_limit",
+    id: "evt_free_limit_1",
     created: 3,
     type: "session.step.failed",
     durable: { aggregateID: session.id, seq: 1, version: 1 },
     data: { sessionID: session.id, assistantMessageID: "msg_free_assistant", error },
   })
-  await setup.waitForFrame((frame) => frame.includes("You've used today's free messages"))
+  await setup.waitForFrame((frame) => frame.includes("Connect OpenCode Go"))
+  setup.mockInput.pressEscape()
+  await setup.waitForFrame((frame) => !frame.includes("Connect OpenCode Go"))
   const frame = setup.captureCharFrame()
-  expect(frame).toContain("resets at")
-  expect(frame).toContain("/connect")
-  expect(frame).toContain("/models")
+  expect(frame).toContain("You've used today's free messages · resets at")
+  expect(frame).toMatch(/^ +Upgrade to OpenCode Go → \/connect *$/m)
+  expect(frame).toMatch(/^ +Switch model → \/models *$/m)
   expect(frame).not.toContain("Error:")
+  // The turn never ran, so it has no agent, model and duration footer; only the composer names the agent.
+  expect(frame).not.toMatch(/^ +Build\b/m)
   // The prompt shows once in the transcript and once more back in the composer.
   await setup.waitForFrame((frame) => frame.split("Refactor the parser").length === 3)
+
+  setup.events.emit({
+    id: "evt_free_limit_2",
+    created: 4,
+    type: "session.step.started",
+    durable: { aggregateID: session.id, seq: 2, version: 1 },
+    data: { sessionID: session.id, assistantMessageID: "msg_free_assistant_2", agent: "build", model, started: 4 },
+  })
+  setup.events.emit({
+    id: "evt_free_limit_3",
+    created: 5,
+    type: "session.step.failed",
+    durable: { aggregateID: session.id, seq: 3, version: 1 },
+    data: { sessionID: session.id, assistantMessageID: "msg_free_assistant_2", error },
+  })
+  await setup.waitForFrame((frame) => frame.split("You've used today's free messages").length === 3)
+  expect(setup.captureCharFrame()).not.toContain("Connect OpenCode Go")
 })
 
 test.each([44, 100])(

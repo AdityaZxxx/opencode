@@ -5,8 +5,15 @@ import type { SessionUserActions } from "../actions"
 
 const DAY = 86_400_000
 
-/** OpenCode's free daily allowance ran out: an expected limit with ways forward, not a failure. */
-export function SessionFreeLimit(props: { resetAt?: number; actions: NonNullable<SessionUserActions["freeLimit"]> }) {
+/**
+ * OpenCode's free daily allowance ran out: an expected limit with ways forward, not a failure. `quiet` keeps a single
+ * line for history when a dialog already offered the ways forward.
+ */
+export function SessionFreeLimit(props: {
+  resetAt?: number
+  quiet?: boolean
+  actions: NonNullable<SessionUserActions["freeLimit"]>
+}) {
   const i18n = useI18n()
 
   const reset = createMemo(() => {
@@ -24,26 +31,37 @@ export function SessionFreeLimit(props: { resetAt?: number; actions: NonNullable
   })
 
   return (
-    <div data-component="session-free-limit" role="status">
-      <div data-slot="session-free-limit-text">
-        <div data-slot="session-free-limit-title">{i18n.t("ui.sessionTurn.freeLimit.title")}</div>
-        <div data-slot="session-free-limit-description">
-          <Show when={reset()} fallback={i18n.t("ui.sessionTurn.freeLimit.description")}>
-            {(time) => i18n.t("ui.sessionTurn.freeLimit.descriptionReset", { time: time() })}
+    <Show
+      when={!props.quiet}
+      fallback={
+        <div data-component="session-free-limit" data-variant="line" role="status">
+          <Show when={reset()} fallback={i18n.t("ui.sessionTurn.freeLimit.title")}>
+            {(time) => i18n.t("ui.sessionTurn.freeLimit.lineReset", { time: time() })}
           </Show>
         </div>
+      }
+    >
+      <div data-component="session-free-limit" role="status">
+        <div data-slot="session-free-limit-text">
+          <div data-slot="session-free-limit-title">{i18n.t("ui.sessionTurn.freeLimit.title")}</div>
+          <div data-slot="session-free-limit-description">
+            <Show when={reset()} fallback={i18n.t("ui.sessionTurn.freeLimit.description")}>
+              {(time) => i18n.t("ui.sessionTurn.freeLimit.descriptionReset", { time: time() })}
+            </Show>
+          </div>
+        </div>
+        <div data-slot="session-free-limit-actions">
+          <Button size="small" variant="submit" onClick={() => props.actions.upgrade()}>
+            {i18n.t("ui.sessionTurn.freeLimit.upgrade")}
+          </Button>
+          <Button size="small" variant="neutral" onClick={() => props.actions.chooseModel()}>
+            {i18n.t("ui.sessionTurn.freeLimit.chooseModel")}
+          </Button>
+          <Button size="small" variant="ghost-muted" onClick={() => props.actions.connectProvider()}>
+            {i18n.t("ui.sessionTurn.freeLimit.connectProvider")}
+          </Button>
+        </div>
       </div>
-      <div data-slot="session-free-limit-actions">
-        <Button size="small" variant="contrast" onClick={() => props.actions.upgrade()}>
-          {i18n.t("ui.sessionTurn.freeLimit.upgrade")}
-        </Button>
-        <Button size="small" variant="neutral" onClick={() => props.actions.chooseModel()}>
-          {i18n.t("ui.sessionTurn.freeLimit.chooseModel")}
-        </Button>
-        <Button size="small" variant="ghost-muted" onClick={() => props.actions.connectProvider()}>
-          {i18n.t("ui.sessionTurn.freeLimit.connectProvider")}
-        </Button>
-      </div>
-    </div>
+    </Show>
   )
 }

@@ -80,6 +80,7 @@ const source = {
   "ui.sessionTurn.freeLimit.description": "Upgrade to OpenCode Go to keep going now, or switch to another model.",
   "ui.sessionTurn.freeLimit.descriptionReset":
     "Free messages reset at {{time}}. Upgrade to OpenCode Go to keep going now, or switch to another model.",
+  "ui.sessionTurn.freeLimit.lineReset": "You've used today's free messages. They reset at {{time}}.",
   "ui.sessionTurn.freeLimit.upgrade": "Upgrade to Go",
   "ui.sessionTurn.freeLimit.chooseModel": "Use another model",
   "ui.sessionTurn.freeLimit.connectProvider": "Connect provider",
@@ -89,6 +90,8 @@ const source = {
   "dialog.usageExceeded.freeTier.title": "Free limit reached",
   "dialog.usageExceeded.freeTier.description":
     "Subscribe to OpenCode Go for reliable access to the best open-source models for $10/month.",
+  "dialog.usageExceeded.freeTier.descriptionReset":
+    "Subscribe to OpenCode Go for reliable access to the best open-source models for $10/month. Your free messages reset at {{time}}.",
   "dialog.usageExceeded.freeTier.actionLabel": "Subscribe",
   "dialog.usageExceeded.accountRateLimit.title": "Go limit reached",
   "dialog.usageExceeded.accountRateLimit.description":

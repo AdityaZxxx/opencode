@@ -4,7 +4,7 @@ import { openDraft, openSession } from "../utils/workspace"
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] })
 
-test("the free usage limit offers ways forward and hands the prompt back", async ({ page }) => {
+test("the free usage limit explains itself once, then offers ways forward inline", async ({ page }) => {
   const sessionID = "ses_free_limit"
   const model = { id: "big-pickle", providerID: "opencode" }
 
@@ -21,30 +21,59 @@ test("the free usage limit offers ways forward and hands the prompt back", async
 
   await expect(page.getByText("Refactor the parser", { exact: true })).toBeVisible()
 
+  const error = {
+    type: "provider.free-limit",
+    message: "Free usage limit reached.",
+    status: 429,
+    retryAfterMs: 3_600_000,
+  }
+
+  const durable = (seq: number) => ({ aggregateID: sessionID, seq, version: 1 })
+  const location = { directory: view.directory }
+
   await view.push([
     {
-      id: "evt_free_limit",
+      id: "evt_free_limit_1",
       created: T0 + 2,
       type: "session.step.failed",
-      location: { directory: view.directory },
-      durable: { aggregateID: sessionID, seq: 1, version: 1 },
-      data: {
-        sessionID,
-        assistantMessageID: "msg_free_assistant",
-        error: {
-          type: "provider.free-limit",
-          message: "Free usage limit reached.",
-          status: 429,
-          retryAfterMs: 3_600_000,
-        },
-      },
+      location,
+      durable: durable(1),
+      data: { sessionID, assistantMessageID: "msg_free_assistant", error },
     },
   ])
 
-  const notice = page.getByRole("status").filter({ hasText: "You've used today's free messages" })
-  await expect(notice).toBeVisible()
+  const upsell = page.getByRole("dialog", { name: "Free limit reached" })
+  await expect(upsell).toContainText("Your free messages reset at")
+  // The modal hides the transcript from role queries, so the quiet line is checked by its text.
+  await expect(page.getByText(/^You've used today's free messages\. They reset at /)).toBeVisible()
+  await expect(page.getByText("Upgrade to Go", { exact: true })).toHaveCount(0)
   await expect(view.editor).toHaveText("Refactor the parser")
   await expect(page.getByText("Free usage limit reached.")).toHaveCount(0)
+  await upsell.getByRole("button", { name: "Don't show again", exact: true }).click()
+  await expect(upsell).toHaveCount(0)
+  const notice = page.getByRole("status").filter({ hasText: "You've used today's free messages" })
+
+  await view.push([
+    {
+      id: "evt_free_limit_2",
+      created: T0 + 3,
+      type: "session.step.started",
+      location,
+      durable: durable(2),
+      data: { sessionID, assistantMessageID: "msg_free_assistant_2", agent: "build", model, started: T0 + 3 },
+    },
+    {
+      id: "evt_free_limit_3",
+      created: T0 + 4,
+      type: "session.step.failed",
+      location,
+      durable: durable(3),
+      data: { sessionID, assistantMessageID: "msg_free_assistant_2", error },
+    },
+  ])
+
+  await expect(notice.getByRole("button", { name: "Upgrade to Go", exact: true })).toBeVisible()
+  await expect(page.getByRole("dialog")).toHaveCount(0)
   await notice.getByRole("button", { name: "Use another model", exact: true }).click()
   await expect(page.getByRole("dialog", { name: "Select model" })).toBeVisible()
 })

@@ -1029,7 +1029,13 @@ export function createSessionTimelineRowRenderer(input: {
             when={current().kind === "free-limit" && input.actions?.freeLimit}
             fallback={<SessionError message={current().text} />}
           >
-            {(actions) => <SessionFreeLimit resetAt={current().resetAt} actions={actions()} />}
+            {(actions) => (
+              <SessionFreeLimit
+                resetAt={current().resetAt}
+                quiet={actions().explained(current().messageID ?? "")}
+                actions={actions()}
+              />
+            )}
           </Show>
         </div>
       </Frame>

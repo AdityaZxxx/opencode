@@ -640,14 +640,18 @@ export namespace Timeline {
 }
 
 function freeLimit(
-  message: Pick<SessionMessageAssistant, "error"> & { time: { created: number; completed?: number } },
+  message: Pick<SessionMessageAssistant, "id" | "error"> & { time: { created: number; completed?: number } },
 ) {
   if (message.error?.type !== "provider.free-limit") return {}
   const delay = message.error.retryAfterMs
 
-  if (delay === undefined) return { kind: "free-limit" as const }
+  if (delay === undefined) return { kind: "free-limit" as const, messageID: message.id }
 
-  return { kind: "free-limit" as const, resetAt: (message.time.completed ?? message.time.created) + delay }
+  return {
+    kind: "free-limit" as const,
+    messageID: message.id,
+    resetAt: (message.time.completed ?? message.time.created) + delay,
+  }
 }
 
 function isInterrupted(error: SessionMessageAssistant["error"]) {

@@ -216,16 +216,18 @@ function SessionScreenContent(props: {
     session.layout.view().dock.close()
   }
 
+  const usageExceeded = useUsageExceededDialogs()
+
   const composer = createActiveSessionRegion({
     session,
     screen,
     timeline,
     region,
     visible: conversationVisible,
+    freeLimitExplained: usageExceeded.freeLimitExplained,
   })
 
   props.bindBackground(composer.requests.background.tasks)
-  useUsageExceededDialogs()
 
   const sessionErrorFallback = (cause: unknown, reset: () => void) => {
     createEffect(on(session.identity.sessionKey, reset, { defer: true }))

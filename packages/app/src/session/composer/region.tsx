@@ -33,6 +33,7 @@ import { resolveSessionComposerSelection } from "./selection"
 import { createSessionRequestModel } from "../requests/model"
 import type { Region } from "@/runtime/extension/panels"
 import { SessionLocationMissing } from "./location-missing"
+import { showGoConnect } from "../usage-exceeded-dialogs"
 
 export function createActiveSessionRegion(input: {
   session: SessionModel
@@ -40,6 +41,7 @@ export function createActiveSessionRegion(input: {
   timeline: SessionTimelineInteraction
   region: Region
   visible: Accessor<boolean>
+  freeLimitExplained: (messageID: string) => boolean
 }) {
   const command = useCommand()
   const data = useData()
@@ -191,17 +193,10 @@ export function createActiveSessionRegion(input: {
   const revertMessage: NonNullable<SessionUserActions["revert"]> = ({ messageID }) => revert.to(messageID)
 
   const freeLimit: NonNullable<SessionUserActions["freeLimit"]> = {
-    upgrade: () => {
-      void import("@/providers/connect/dialog").then((connect) => {
-        const controller = connect.useProviderConnectController()
-        controller.select("opencode-go")
-        void dialog.show(() => (
-          <connect.DialogConnectProvider directory={location().directory} controller={controller} />
-        ))
-      })
-    },
+    upgrade: () => showGoConnect(dialog, location().directory),
     chooseModel: () => command.trigger("model.choose"),
     connectProvider: () => command.trigger("provider.connect"),
+    explained: input.freeLimitExplained,
   }
 
   // The free allowance stops a prompt after it was sent. Hand its text back so switching models and resending is one

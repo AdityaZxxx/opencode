@@ -153,6 +153,14 @@
     }
   }
 
+  [data-component="session-free-limit"][data-variant="line"] {
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    color: var(--v2-text-text-muted);
+    font-weight: 440;
+  }
+
   [data-component="card"][data-kind="session-error-card"] {
     --card-pad-y: 0px;
     --card-pad-l: 0px;
