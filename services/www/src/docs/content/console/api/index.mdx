@@ -128,10 +128,7 @@ curl --fail-with-body "${CONSOLE_URL}/api/v2/config" \
       "name": "OpenCode",
       "env": ["OPENCODE_CONSOLE_TOKEN"],
       "package": "aisdk:@ai-sdk/openai-compatible",
-      "settings": {
-        "baseURL": "https://opencode.ai/inference/openai/v1",
-        "apiKey": "{env:OPENCODE_CONSOLE_TOKEN}"
-      },
+      "settings": { "baseURL": "https://opencode.ai/inference/openai/v1" },
       "headers": { "x-opencode-org-id": "org_..." },
       "models": {
         "kimi-k2.6": { "name": "Kimi K2.6" }
@@ -150,6 +147,42 @@ curl --fail-with-body "${CONSOLE_URL}/api/v2/config" \
 | `experimental.policies` | Deprecated name for `policies`, still accepted.                                  |
 
 Every key permission level and member role can read the config.
+
+### How OpenCode applies it
+
+Each provider is a diff over OpenCode's model catalog, applied with the same rules as local
+[provider config](/providers#models). A model sets only what differs from its catalog entry:
+
+```json
+{
+  "providers": {
+    "opencode": {
+      "models": {
+        "claude-sonnet-4-5": {
+          "package": "aisdk:@ai-sdk/anthropic",
+          "capabilities": { "reasoning": { "supported": true, "budget": { "min": 1024 } } },
+          "variants": [{ "id": "max", "headers": { "x-tier": "max" } }],
+          "limit": { "output": 64000 }
+        }
+      }
+    }
+  }
+}
+```
+
+| Field                                                                      | Rule                                                                        |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `package`, `canonical`, `modelID`, `family`, `name`, `releaseDate`, `cost` | Replaces the catalog value.                                                 |
+| `settings`, `body`                                                         | Deep merge. Credentials in `settings` are ignored.                          |
+| `headers`                                                                  | Merge; header names are case-insensitive.                                   |
+| `compatibility`, `limit`                                                   | Shallow merge.                                                              |
+| `capabilities`                                                             | `tools`, `input`, `output`, and `temperature` each replace.                 |
+| `disabled`                                                                 | Hides the model when `true`.                                                |
+| `capabilities.reasoning`                                                   | Builds the model's variants once `package` is resolved and `limit` applied. |
+| `variants`                                                                 | Merge by `id` onto the built or catalog variants.                           |
+
+A provider-level `package` or `settings.baseURL` replaces the catalog's per-model route for every model the provider
+lists. OpenCode authenticates with the Console connection, so the config never needs an API key.
 
 ## Errors
 
