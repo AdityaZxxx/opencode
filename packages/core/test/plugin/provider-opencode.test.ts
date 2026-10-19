@@ -145,7 +145,62 @@ describe("OpencodePlugin", () => {
         },
         { type: "key", label: "API key (service account)" },
       ])
+      expect((yield* integrations.get(Integration.ID.make("opencode-go")))?.methods).toEqual([
+        {
+          id: Integration.MethodID.make("device"),
+          type: "oauth",
+          label: "OpenCode Console account",
+          form: [
+            { key: "server", type: "string", format: "uri", hidden: true, default: "https://opencode.ai/console" },
+          ],
+        },
+        { type: "key", label: "API key" },
+      ])
     }),
+  )
+
+  it.live("authorizes OpenCode Go with the Console device flow", () =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => consoleServer("org-a")),
+      ({ server, config }) =>
+        Effect.gen(function* () {
+          yield* addPlugin()
+          const integrations = yield* Integration.Service
+          const credentials = yield* Credential.Service
+          const integrationID = Integration.ID.make("opencode-go")
+          const attempt = yield* integrations.oauth.connect({
+            integrationID,
+            methodID: Integration.MethodID.make("device"),
+            answer: { server: server.url.origin },
+          })
+          const status = yield* eventually(
+            integrations.oauth.status({ integrationID, attemptID: attempt.attemptID }),
+            (status) => status.status !== "pending",
+          )
+          expect(status.status).toBe("complete")
+          expect((yield* credentials.list(integrationID))[0]).toMatchObject({
+            label: "Alpha",
+            value: {
+              type: "oauth",
+              access: "access",
+              refresh: "refresh",
+              metadata: {
+                server: server.url.origin,
+                accountID: "user",
+                email: "user@example.com",
+                orgID: "org-a",
+                orgName: "Alpha",
+              },
+            },
+          })
+          yield* eventually(
+            Effect.sync(() => config.length),
+            (count) => count > 0,
+          )
+          expect(config).toEqual([{ authorization: "Bearer access", orgID: "org-a" }])
+        }),
+      ({ server }) => Effect.promise(() => server.stop(true)),
+    ),
   )
 
   it.live("uses a canonical custom server throughout device authorization", () =>
