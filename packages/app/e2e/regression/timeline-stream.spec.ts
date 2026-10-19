@@ -1062,11 +1062,13 @@ test.describe("background shortcut", () => {
     await activity.click()
     await expect(list.getByText("2 subagents · 1 shell", { exact: true })).toHaveCount(0)
     await expect(label).toBeVisible()
+
     // The panel opens just above the capsule, without covering it, and its rows sit on the capsule's columns.
     await expect
       .poll(async () => {
         const panel = await list.boundingBox()
         const anchor = await capsule.boundingBox()
+
         const rows = await list.getByRole("menuitem").evaluateAll((items) =>
           items.map((item) => {
             const content = item.querySelector('[data-slot="menu-v2-item-content"]')
