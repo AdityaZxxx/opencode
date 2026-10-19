@@ -1,62 +1,22 @@
-import { Duration, Effect, Equal, Option, Schema, SchemaGetter, Scope, Semaphore, Stream } from "effect"
+import { Duration, Effect, Equal, Option, Schema, Scope, Semaphore, Stream, Struct } from "effect"
 import type { IntegrationOAuthMethodRegistration } from "@opencode/plugin/effect/integration"
 import { define } from "@opencode/plugin/effect/plugin"
 import type { SessionHttpResponse } from "@opencode/plugin/effect/session"
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http"
 import { App } from "../../app.js"
 import { Bus } from "../../bus.js"
+import { ConfigProviderOverlay } from "../../config/provider-overlay.js"
 import { Credential } from "../../credential.js"
 import { Integration } from "../../integration.js"
 import { IntegrationConnection } from "../../integration/connection.js"
 import { ManagedPolicy } from "../../managed-policy.js"
-import { Model } from "../../model.js"
 import { Provider } from "../../provider.js"
-import { Variant } from "../../variant.js"
 import { WebSearch } from "../../websearch.js"
-import { ConfigPolicy } from "@opencode/schema/config/policy"
-import { ConfigProvider } from "@opencode/schema/config/provider"
-import { Mcp } from "@opencode/schema/mcp"
-import { Money } from "@opencode/schema/money"
+import { ConfigConsole } from "@opencode/schema/config/console"
 
 const defaultServer = "https://opencode.ai/console"
 const clientID = "opencode-cli"
 const methodID = Integration.MethodID.make("device")
-// Drop statements whose action or effect is a value this version does not know, so a newer Console can
-// extend either enum. Malformed statements still fail validation.
-const RemotePolicies = Schema.Array(Schema.Unknown).pipe(
-  Schema.decodeTo(Schema.Unknown, {
-    decode: SchemaGetter.transform((policies) =>
-      policies.filter((policy) => {
-        const action = Schema.decodeUnknownOption(Schema.Struct({ action: Schema.String }))(policy)
-        if (Option.isSome(action) && !Schema.is(ConfigPolicy.Info.fields.action)(action.value.action)) return false
-        const effect = Schema.decodeUnknownOption(Schema.Struct({ effect: Schema.String }))(policy)
-        return Option.isNone(effect) || Schema.is(ConfigPolicy.Effect)(effect.value.effect)
-      }),
-    ),
-    encode: SchemaGetter.passthrough({ strict: false }),
-  }),
-  Schema.decodeTo(Schema.Array(ConfigPolicy.Info)),
-  Schema.optional,
-)
-const RemoteResponse = Schema.Struct({
-  providers: Schema.Record(Schema.String, ConfigProvider.Info),
-  websearch: Schema.Struct({
-    providerID: WebSearch.ID,
-  }).pipe(Schema.optional),
-  // MCP servers by name, in the same shape as a remote server in local config. Only remote servers are
-  // accepted so the Console can never make the client run a command. `auth: "console"` asks the client
-  // to attach its own Console credential to that server's requests.
-  mcp: Schema.Struct({
-    servers: Schema.Record(
-      Schema.String,
-      Schema.Struct({ ...Mcp.RemoteConfig.fields, auth: Schema.Literal("console").pipe(Schema.optional) }),
-    ),
-  }).pipe(Schema.optional),
-  // Organization policy compiled for the authenticated caller; omitted when there is none.
-  // `experimental.policies` remains accepted alongside top-level `policies`.
-  policies: RemotePolicies,
-  experimental: Schema.Struct({ policies: RemotePolicies }).pipe(Schema.optional),
-})
 const Device = Schema.Struct({
   device_code: Schema.String,
   user_code: Schema.String,
@@ -195,12 +155,12 @@ export const OpencodePlugin = define<HttpClient.HttpClient | Bus.Service | Manag
     const loading = Semaphore.makeUnsafe(1)
     type ActiveConnection = Effect.Success<ReturnType<typeof ctx.integration.connection.active>>
     let snapshot: {
-      config: typeof RemoteResponse.Type | undefined
+      config: ConfigConsole.Response | undefined
       connection: ActiveConnection
       organization: string | undefined
       // Console MCP servers carry the credential in their headers, so a rotated token changes the snapshot.
       mcp:
-        | { servers: NonNullable<typeof RemoteResponse.Type.mcp>["servers"]; headers: Record<string, string> }
+        | { servers: NonNullable<ConfigConsole.Response["mcp"]>["servers"]; headers: Record<string, string> }
         | undefined
     } = { config: undefined, connection: undefined, organization: undefined, mcp: undefined }
     // Status last reported for the active connection, so inference failures can name the fix.
@@ -264,77 +224,36 @@ export const OpencodePlugin = define<HttpClient.HttpClient | Bus.Service | Manag
     snapshot = yield* load()
     yield* publish(snapshot)
     yield* ctx.provider.transform((providers) => {
+      // The Console connection supplies credentials, so Console definitions never keep their own.
+      const models: ConfigProviderOverlay.Models = {
+        update: (providerID, modelID, update) =>
+          providers.models.update(providerID, modelID, (model) => {
+            update(model)
+            if (model.settings) model.settings = withoutCredentials(model.settings)
+            for (const variant of model.variants)
+              if (variant.settings) variant.settings = withoutCredentials(variant.settings)
+          }),
+        provider: (providerID) => providers.get(providerID)?.provider,
+      }
       for (const [providerID, item] of Object.entries(snapshot.config?.providers ?? {})) {
         const source = providers.get(item.canonical ?? providerID)
         providers.update(providerID, (provider) => {
           if (source && source.provider !== provider)
             Object.assign(provider, structuredClone(source.provider), { id: provider.id })
           provider.integrationID = Integration.ID.make("opencode")
-          if (item.canonical !== undefined) provider.canonical = item.canonical
-          if (item.name !== undefined) provider.name = item.name
-          provider.package = item.package ?? provider.package
-          provider.settings = Provider.mergeOverlay(
-            withoutCredentials(provider.settings),
-            withoutCredentials(item.settings),
-          )
-          provider.headers = Provider.mergeHeaders(provider.headers, item.headers)
-          provider.body = Provider.mergeOverlay(provider.body, item.body)
+          ConfigProviderOverlay.provider(provider, item)
+          if (provider.settings) provider.settings = withoutCredentials(provider.settings)
         })
-
-        for (const [modelID, config] of Object.entries(item.models ?? {})) {
-          const base = source?.models.get(config.modelID ?? modelID) ?? source?.models.get(modelID)
-          providers.models.update(providerID, modelID, (model) => {
-            Object.assign(model, structuredClone(base ?? model))
-            if (config.family !== undefined) model.family = config.family
-            if (config.name !== undefined) model.name = config.name
-            if (config.modelID !== undefined) model.modelID = config.modelID
-            if (config.releaseDate !== undefined) model.time = { released: Date.parse(config.releaseDate) }
-            if (config.compatibility !== undefined)
-              model.compatibility = { ...model.compatibility, ...config.compatibility }
-            model.package = config.package ?? (item.package !== undefined ? undefined : model.package)
-            if (item.settings?.baseURL !== undefined && model.settings) delete model.settings.baseURL
-            if (config.capabilities !== undefined)
-              model.capabilities = Model.mergeCapabilities(config.capabilities, model.capabilities)
-            model.settings = Provider.mergeOverlay(
-              withoutCredentials(model.settings),
-              withoutCredentials(config.settings),
-            )
-            model.headers = Provider.mergeHeaders(model.headers, config.headers)
-            model.body = Provider.mergeOverlay(model.body, config.body)
-            if (config.limit !== undefined) model.limit = { ...model.limit, ...config.limit }
-            // The Console's reasoning replaces the base variants; its variants still overlay them below.
-            if (config.capabilities?.reasoning !== undefined)
-              model.variants = [
-                ...Variant.resolve(
-                  { ...model, package: model.package ?? providers.get(providerID)?.provider.package },
-                  Variant.supports(config.capabilities.reasoning),
-                ),
-              ]
-            for (const variant of config.variants ?? []) {
-              let existing = model.variants.find((item) => item.id === variant.id)
-              if (!existing) {
-                existing = { id: variant.id }
-                model.variants.push(existing)
-              }
-              if (variant.settings !== undefined)
-                existing.settings = Provider.mergeOverlay(existing.settings, withoutCredentials(variant.settings))
-              if (variant.headers !== undefined)
-                existing.headers = Provider.mergeHeaders(existing.headers, variant.headers)
-              if (variant.body !== undefined) existing.body = Provider.mergeOverlay(existing.body, variant.body)
-            }
-            if (config.cost !== undefined)
-              model.cost = (Array.isArray(config.cost) ? config.cost : [config.cost]).map((cost) => ({
-                tier: cost.tier && { ...cost.tier },
-                input: cost.input,
-                output: cost.output,
-                cache: {
-                  read: cost.cache?.read ?? Money.USDPerMillionTokens.zero,
-                  write: cost.cache?.write ?? Money.USDPerMillionTokens.zero,
-                },
-              }))
-            model.enabled = !config.disabled
+        for (const [modelID, config] of Object.entries(item.models ?? {}))
+          ConfigProviderOverlay.model(models, {
+            providerID,
+            modelID,
+            provider: item,
+            model: config,
+            base: ConfigProviderOverlay.base(source, modelID, config),
+            rebase: true,
+            inferVariants: false,
           })
-        }
         const configured = providers.get(providerID)
         if (configured)
           providers.add({
@@ -522,7 +441,7 @@ function fetchConfig(http: HttpClient.HttpClient, value: Credential.Key | Creden
               })
           }
           return yield* HttpClientResponse.filterStatusOk(response).pipe(
-            Effect.flatMap(HttpClientResponse.schemaBodyJson(RemoteResponse)),
+            Effect.flatMap(HttpClientResponse.schemaBodyJson(ConfigConsole.Response)),
           )
         }),
       ),
@@ -571,11 +490,8 @@ function serverUrl(value: Credential.Value) {
   return typeof value.metadata?.server === "string" ? value.metadata.server : defaultServer
 }
 
-function withoutCredentials<Value>(body: Readonly<Record<string, Value>> | undefined) {
-  return (
-    body &&
-    Object.fromEntries(Object.entries(body).filter(([key]) => !["apiKey", "authToken", "accessToken"].includes(key)))
-  )
+function withoutCredentials<Settings extends Readonly<Record<string, unknown>>>(settings: Settings) {
+  return Struct.omit(settings, ["apiKey", "authToken", "accessToken"])
 }
 
 function normalizeServer(input: unknown) {

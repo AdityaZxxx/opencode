@@ -3,12 +3,10 @@ export * as ConfigProviderPlugin from "./provider.js"
 import { define } from "@opencode/plugin/effect/plugin"
 import { Document, type Entry } from "@opencode/schema/config"
 import { ConfigProvider } from "@opencode/schema/config/provider"
-import { Money } from "@opencode/schema/money"
 import { Effect } from "effect"
 import { Config } from "../../config.js"
 import { Model } from "../../model.js"
-import { Provider } from "../../provider.js"
-import { Variant } from "../../variant.js"
+import { ConfigProviderOverlay } from "../provider-overlay.js"
 import { ConfigEntryObserver } from "./entry-observer.js"
 
 export const Plugin = define({
@@ -65,28 +63,17 @@ export const Plugin = define({
               integrationID: provider.integrationID,
             })
           provider.activation = "enabled"
-          if (item.canonical !== undefined) provider.canonical = item.canonical
-          if (item.name) provider.name = item.name
-          if (item.package !== undefined) provider.package = item.package
-          if (item.compatibility !== undefined)
-            provider.compatibility = { ...provider.compatibility, ...item.compatibility }
-          if (item.settings !== undefined) provider.settings = Provider.mergeOverlay(provider.settings, item.settings)
-          if (item.headers !== undefined) provider.headers = Provider.mergeHeaders(provider.headers, item.headers)
-          if (item.body !== undefined) provider.body = Provider.mergeOverlay(provider.body, item.body)
+          ConfigProviderOverlay.provider(provider, item)
         })
         const definitions = new Map<string, { readonly inherit: boolean; readonly base?: Model.Info }>()
         for (const [id, config] of Object.entries(item.models ?? {})) {
-          const base = source?.models.get(config.modelID ?? id) ?? source?.models.get(id)
+          const base = ConfigProviderOverlay.base(source, id, config)
           const inherit = changed || !current?.models.has(id)
           // Bind the source at this point in the provider fold. Later source edits/removal
           // and its credential availability must not change an already-defined alias.
           definitions.set(id, { inherit, base: base && structuredClone(base) })
           if (!inherit) continue
-          providers.models.update(providerID, id, (model) => {
-            if (base) Object.assign(model, structuredClone(base))
-            if (item.package !== undefined) model.package = undefined
-            if (item.settings?.baseURL !== undefined && model.settings) delete model.settings.baseURL
-          })
+          providers.models.update(providerID, id, (model) => ConfigProviderOverlay.rebase(model, base, item))
         }
         next.set(item, { providerID, models: definitions })
       }
@@ -107,81 +94,20 @@ export const Plugin = define({
     yield* ctx.model.transform((models) => {
       const configuredDefault = sources.defaultModel
       if (configuredDefault !== undefined) models.default.set(configuredDefault.providerID, configuredDefault.model)
+      const editor = { update: models.update, provider: (id: string) => models.provider.get(id)?.provider }
       for (const [item, definition] of sources.models) {
         const providerID = definition.providerID
         for (const [id, config] of Object.entries(item.models ?? {})) {
           const source = definition.models.get(id)
-          const inherit = source?.inherit || !models.get(providerID, id)
-          models.update(providerID, id, (model) => {
-            if (inherit && source?.base) {
-              Object.assign(model, structuredClone(source.base))
-              if (item.package !== undefined) model.package = undefined
-              if (item.settings?.baseURL !== undefined && model.settings) delete model.settings.baseURL
-            }
-            if (config.family !== undefined) model.family = config.family
-            if (config.name) model.name = config.name
-            if (config.modelID !== undefined) model.modelID = config.modelID
-            if (config.releaseDate !== undefined) model.time = { released: Date.parse(config.releaseDate) }
-            if (config.compatibility !== undefined)
-              model.compatibility = { ...model.compatibility, ...config.compatibility }
-            if (config.package !== undefined) model.package = config.package
-            if (config.settings !== undefined) model.settings = Provider.mergeOverlay(model.settings, config.settings)
-            if (config.headers !== undefined) model.headers = Provider.mergeHeaders(model.headers, config.headers)
-            if (config.body !== undefined) model.body = Provider.mergeOverlay(model.body, config.body)
-            if (config.capabilities !== undefined)
-              model.capabilities = Model.mergeCapabilities(config.capabilities, model.capabilities)
-            if (config.limit !== undefined) model.limit = { ...model.limit, ...config.limit }
-            // Configured reasoning replaces the base variants; configured variants still overlay them below.
-            if (config.capabilities?.reasoning !== undefined)
-              model.variants = [
-                ...Variant.resolve(
-                  { ...model, package: model.package ?? models.provider.get(providerID)?.provider.package },
-                  Variant.supports(config.capabilities.reasoning),
-                ),
-              ]
-            if (config.variants !== undefined) {
-              model.variants ??= []
-              for (const variant of config.variants) {
-                let existing = model.variants.find((item) => item.id === variant.id)
-                if (!existing) {
-                  existing = { id: variant.id }
-                  model.variants.push(existing)
-                }
-                if (variant.settings !== undefined)
-                  existing.settings = Provider.mergeOverlay(existing.settings, variant.settings)
-                if (variant.headers !== undefined)
-                  existing.headers = Provider.mergeHeaders(existing.headers, variant.headers)
-                if (variant.body !== undefined) existing.body = Provider.mergeOverlay(existing.body, variant.body)
-              }
-            }
-            if (config.cost !== undefined) {
-              model.cost = (Array.isArray(config.cost) ? config.cost : [config.cost]).map((cost) => ({
-                tier: cost.tier && { ...cost.tier },
-                input: cost.input,
-                output: cost.output,
-                cache: {
-                  read: cost.cache?.read ?? Money.USDPerMillionTokens.zero,
-                  write: cost.cache?.write ?? Money.USDPerMillionTokens.zero,
-                },
-              }))
-            }
-            if (config.disabled !== undefined) model.enabled = !config.disabled
+          ConfigProviderOverlay.model(editor, {
+            providerID,
+            modelID: id,
+            provider: item,
+            model: config,
+            base: source?.base,
+            rebase: (source?.inherit || !models.get(providerID, id)) && source?.base !== undefined,
+            inferVariants: true,
           })
-          // Inherited variants are spelled for the base model's package, so a package override needs fresh ones.
-          // A base without variants has no reasoning support to respell.
-          const repackaged =
-            source?.base !== undefined &&
-            source.base.variants.length > 0 &&
-            models.get(providerID, id)?.package !== source.base.package
-          if (config.variants === undefined && config.capabilities?.reasoning === undefined && (!source?.base || repackaged))
-            models.update(providerID, id, (model) => {
-              model.variants = [
-                ...Variant.resolve({
-                  ...model,
-                  package: model.package ?? models.provider.get(providerID)?.provider.package,
-                }),
-              ]
-            })
         }
       }
     })
