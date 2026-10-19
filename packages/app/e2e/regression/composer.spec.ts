@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
-import { NO_PROVIDER, T0, provider, sessionHref } from "../utils/app"
+import { NO_PROVIDER, SERVER, T0, holdRoute, provider, sessionHref } from "../utils/app"
 import { mockWorkspace, openDraft, openSession } from "../utils/workspace"
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] })
@@ -87,7 +87,7 @@ test("a catalog refresh cannot replace an existing session's model", async ({ pa
   ])
 })
 
-test("an existing session's model waits for its agent instead of showing a fallback", async ({ page }) => {
+test("an existing session's model never shows a fallback while its agent loads", async ({ page }) => {
   const sessionID = "ses_agent_pending"
   await mockWorkspace(page, {
     name: "AgentPending",
@@ -101,20 +101,102 @@ test("an existing session's model waits for its agent instead of showing a fallb
     await route.fallback()
   })
 
+  // Every chip text painted from the first frame, so a fallback shown for even one frame fails the test.
+  await page.addInitScript(() => {
+    const seen = new Set<string>()
+    window.__chipTexts = seen
+
+    const tick = () => {
+      const text = document.querySelector('[data-action="composer-model"]')?.textContent
+
+      if (text) seen.add(text)
+      requestAnimationFrame(tick)
+    }
+
+    requestAnimationFrame(tick)
+  })
+
   const catalog = ["/api/model", "/api/provider", "/api/config"].map((path) =>
     page.waitForResponse((response) => new URL(response.url()).pathname === path),
   )
 
+  const agentRequested = page.waitForRequest((request) => new URL(request.url()).pathname === "/api/agent")
   await page.goto(sessionHref(sessionID))
   await Promise.all(catalog)
   await expect(page.locator('[data-component="composer-editor"]')).toBeEditable()
 
   const control = page.locator('[data-action="composer-model"]')
-  // The recent model must not stand in for the session's model while its agent is unresolved.
-  await expect(control).toBeHidden()
+  // The recent model must not stand in for the session's model while its agent is unresolved. The chip may stay
+  // hidden or name the session's own model, which the loaded selection then keeps.
+  await agentRequested
+  const agentLoaded = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/agent")
   agents.resolve()
+  await agentLoaded
   await expect(control).toHaveText("OpenCode / Alpha")
+  expect(await page.evaluate(() => [...(window.__chipTexts ?? [])])).toEqual(["OpenCode / Alpha"])
 })
+
+test("an opened session in another Location names its model from a loaded catalog before its agents load", async ({
+  page,
+}) => {
+  const other = "C:/OpenCode/WarmOther"
+  await mockWorkspace(page, {
+    name: "WarmOpen",
+    sessions: [
+      { id: "ses_warm_here", title: "Here", agent: "build", model: { id: "alpha", providerID: "opencode" } },
+      {
+        id: "ses_warm_there",
+        title: "There",
+        directory: other,
+        location: { directory: other },
+        agent: "build",
+        model: { id: "beta", providerID: "opencode", variant: "high" },
+      },
+    ],
+    provider: provider({ id: "alpha", name: "Alpha" }, { id: "beta", name: "Beta (latest)", variants: { high: {} } }),
+    seed: { settings: { appearance: { tabLayout: "vertical" } } },
+  })
+
+  const control = page.locator('[data-action="composer-model"]')
+  await page.goto(sessionHref("ses_warm_here"))
+  await expect(control).toHaveText("OpenCode / Alpha")
+
+  const held = await holdRoute(
+    page,
+    (url) =>
+      ["/api/agent", "/api/config"].includes(url.pathname) && url.searchParams.get("location[directory]") === other,
+  )
+
+  try {
+    await page.locator(`[data-slot="vertical-tabs"] a[href="${sessionHref("ses_warm_there", SERVER)}"]`).click()
+    await held.arrived
+    await expect(control).toHaveText("OpenCode / Beta")
+    await expect(page.getByRole("button", { name: "Choose model variant" })).toHaveText("high")
+    const painted = await control.elementHandle()
+
+    const loaded = ["/api/agent", "/api/config"].map((path) =>
+      page.waitForResponse((response) => {
+        const url = new URL(response.url())
+
+        return url.pathname === path && url.searchParams.get("location[directory]") === other
+      }),
+    )
+
+    held.release()
+    await Promise.all(loaded)
+    // The loaded selection keeps the same chip instead of replacing it.
+    await expect(control).toHaveText("OpenCode / Beta")
+    expect(await painted?.evaluate((element) => element.isConnected)).toBe(true)
+  } finally {
+    held.release()
+  }
+})
+
+declare global {
+  interface Window {
+    __chipTexts?: Set<string>
+  }
+}
 
 test("names a Console-managed provider without its workspace unless a direct connection shares it", async ({
   page,
@@ -375,6 +457,7 @@ test("keeps focus in a dialog that replaces the model dialog and returns it to t
     name: "ComposerDialogFocus",
     provider: provider({ id: "paid", name: "Paid", cost: { input: 1, output: 1 } }),
   })
+
   await editor.fill("keep me")
   await editor.press("End")
   await editor.press("ArrowLeft")

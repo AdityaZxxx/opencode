@@ -7,6 +7,7 @@ import {
   draftHref,
   expectPath,
   holdRoute,
+  pageMessagesFrom,
   project,
   seed,
   session,
@@ -369,10 +370,13 @@ test("vertical tabs resize, scroll, show shortcut hints, and navigate", async ({
   const actions = await Promise.all(
     ["vertical-tabs-home", "vertical-tabs-search", "vertical-tabs-new-session"].map(async (action) => {
       const box = await sidebar.locator(`[data-action="${action}"]`).boundingBox()
+
       if (!box) throw new Error(`${action} is not rendered`)
+
       return box
     }),
   )
+
   const gaps = actions.slice(1).map((box, index) => box.y - (actions[index].y + actions[index].height))
   expect(gaps).toEqual([4, 4])
 
@@ -1075,3 +1079,45 @@ async function twoServers(
     tabs: [input.a[0]!.id, { session: input.b[0]!.id, server: REMOTE_SERVER }],
   })
 }
+
+test("loads a tab's transcript while the pointer rests on it, and not when it passes over", async ({ page }) => {
+  const requested: string[] = []
+  page.on("request", (request) => {
+    const id = new URL(request.url()).pathname.match(/^\/api\/session\/([^/]+)\/message$/)?.[1]
+
+    if (id && request.method() === "GET") requested.push(id)
+  })
+
+  await mockWorkspace(page, {
+    name: "HoverPrefetch",
+    sessions: [a, b, c],
+    pageMessages: pageMessagesFrom(
+      Object.fromEntries(
+        [a, b, c].map((item): [string, SessionMessageInfo[]] => [
+          item.id,
+          [{ id: `msg_${item.id}`, type: "user", time: { created: 1700000000000 }, text: item.title }],
+        ]),
+      ),
+    ),
+    seed: { settings: { appearance: { tabLayout: "vertical" } } },
+  })
+  await page.goto(sessionHref(a.id))
+  await expectSessionTitle(page, a.title)
+  const tab = (id: string) => page.locator(`[data-slot="vertical-tabs"] a[href="${sessionHref(id, SERVER)}"]`)
+  const message = (id: string) => page.locator(`[data-timeline-virtual-content] [data-message-id="msg_${id}"]`)
+  await expect(message(a.id)).toBeVisible()
+
+  // Raw moves keep the pass well under the dwell, which hover() actionability checks can exceed on slow runners.
+  const [passed, rest] = await Promise.all([tab(c.id).boundingBox(), tab(a.id).boundingBox()])
+
+  await page.mouse.move(passed!.x + passed!.width / 2, passed!.y + passed!.height / 2)
+  await page.mouse.move(rest!.x + rest!.width / 2, rest!.y + rest!.height / 2)
+  await tab(b.id).hover()
+  await expect.poll(() => requested.includes(b.id)).toBe(true)
+  // A dwell started by the pass would have fired before the one on the rested tab.
+  expect(requested).not.toContain(c.id)
+
+  await tab(b.id).click()
+  await expect(message(b.id)).toBeVisible()
+  expect(requested.filter((id) => id === b.id)).toHaveLength(1)
+})
