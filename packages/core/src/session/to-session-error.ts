@@ -94,11 +94,16 @@ export function contentFilterError(summary: string, reason: FinishReasonDetails)
   }
 }
 
+const retiredModelMessage = "This model was retired, pick another"
+
 function providerError(type: string, reason: AIError["reason"]): SessionError.Error {
   const status = reason.http?.status
   return {
     type,
-    message: Object.entries(tokenSharingMessages).find(([code]) => reason.body?.includes(code))?.[1] ?? reason.message,
+    message:
+      status === 410
+        ? retiredModelMessage
+        : (Object.entries(tokenSharingMessages).find(([code]) => reason.body?.includes(code))?.[1] ?? reason.message),
     ...(status === undefined ? {} : { status }),
     ...(reason.body === undefined ? {} : { response: { body: reason.body } }),
   }

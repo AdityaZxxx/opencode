@@ -28,10 +28,16 @@ const createModelsController = (directory: Accessor<string | undefined>) => {
 
   const available = createMemo(() =>
     providers.connected().flatMap((p) =>
-      Object.values(p.models).map((m) => ({
-        ...m,
-        provider: p,
-      })),
+      Object.values(p.models).flatMap((m) =>
+        m.status === "deprecated"
+          ? []
+          : [
+              {
+                ...m,
+                provider: p,
+              },
+            ],
+      ),
     ),
   )
 

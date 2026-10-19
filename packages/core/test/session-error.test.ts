@@ -126,6 +126,22 @@ describe("toSessionError", () => {
       message: "bad gateway",
       status: 502,
     })
+    expect(
+      toSessionError(
+        llm(
+          new InvalidRequestError({
+            message: "Model muse-spark-1.3-contributor-free has been deprecated.",
+            body: "Model muse-spark-1.3-contributor-free has been deprecated.",
+            http: new HttpContext({ url: "https://opencode.ai/zen/v1/chat/completions", status: 410, headers: {} }),
+          }),
+        ),
+      ),
+    ).toEqual({
+      type: "provider.invalid-request",
+      message: "This model was retired, pick another",
+      status: 410,
+      response: { body: "Model muse-spark-1.3-contributor-free has been deprecated." },
+    })
   })
 
   test("preserves provider response body without HTTP status", () => {

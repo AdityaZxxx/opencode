@@ -223,7 +223,15 @@ const layer = Layer.effect(
         const all = Array.from(byProvider.values())
           .flatMap((models) => Array.from(models.values()))
           .sort((left, right) => right.time.released - left.time.released)
-        cached = freeze({ data, all, available: preferFree(all.filter((model) => model.enabled)), byProvider }, true)
+        cached = freeze(
+          {
+            data,
+            all,
+            available: preferFree(all.filter((model) => model.enabled && model.status !== "deprecated")),
+            byProvider,
+          },
+          true,
+        )
         return cached
       }
     })
@@ -266,7 +274,7 @@ const layer = Layer.effect(
         const value = yield* read()
         const requested = value.data.defaultModel
         const model = requested && value.byProvider.get(requested.providerID)?.get(requested.modelID)
-        return model?.enabled ? model : value.available.find(supportsText)
+        return model?.enabled && model.status !== "deprecated" ? model : value.available.find(supportsText)
       }),
       small: Effect.fn("Model.small")(function* (providerID) {
         const value = yield* read()
@@ -293,7 +301,6 @@ const PREFERRED_FREE = [
   "big-pickle",
   "deepseek-v4.1-flash-free",
   "glm-5.3-flash-free",
-  "muse-spark-1.3-contributor-free",
 ]
 
 function preferFree(models: Info[]) {

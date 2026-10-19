@@ -576,18 +576,22 @@ describe("Provider and Model", () => {
       const models = yield* Model.Service
       yield* providers.transform((editor) => {
         editor.update(Provider.ID.opencode, () => {})
-        ;["muse-spark-1.3-contributor-free", "new-free", "deepseek-v4.1-flash-free", "big-pickle"].forEach(
+        ;["glm-5.3-flash-free", "new-free", "deepseek-v4.1-flash-free", "big-pickle"].forEach(
           (id, index) =>
             editor.models.update(Provider.ID.opencode, Model.ID.make(id), (model) => {
               model.time.released = 4000 - index * 1000
             }),
         )
+        editor.models.update(Provider.ID.opencode, Model.ID.make("muse-spark-1.3-contributor-free"), (model) => {
+          model.time.released = 5000
+          model.status = "deprecated"
+        })
       })
 
       expect((yield* models.available()).map((model) => model.id)).toEqual([
         Model.ID.make("big-pickle"),
         Model.ID.make("deepseek-v4.1-flash-free"),
-        Model.ID.make("muse-spark-1.3-contributor-free"),
+        Model.ID.make("glm-5.3-flash-free"),
         Model.ID.make("new-free"),
       ])
       expect((yield* models.default())?.id).toBe(Model.ID.make("big-pickle"))
