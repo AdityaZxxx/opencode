@@ -1086,9 +1086,10 @@ test.describe("background shortcut", () => {
       })
       .toBe(true)
     await expect(list.getByRole("menuitem")).toHaveText([
-      /^Build\s*Foreground task$/,
-      /^Explore\s*Background task$/,
-      /^sleep 120$/,
+      // The fixture starts every task near the epoch, so each row ends with an hours-long run time.
+      /^Build\s*Foreground task\d+h \d{2}m$/,
+      /^Explore\s*Background task\d+h \d{2}m$/,
+      /^sleep 120\d+h \d{2}m$/,
     ])
     await list.getByRole("menuitem", { name: /sleep 120/ }).click()
     await expect(list).toHaveCount(0)
