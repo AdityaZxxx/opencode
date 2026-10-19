@@ -30,6 +30,7 @@ import { ToolRegistry, type ContextGroupPart } from "../tools/tool-renderer"
 import { GenericTool } from "../components/basic-tool"
 import { SessionRetry } from "../components/session-retry"
 import { SessionError } from "../components/session-error"
+import { SessionFreeLimit } from "../components/session-free-limit"
 import { timelineCategory, type TimelineDetail } from "./detail"
 import { currentToolFailed } from "../message/current-tool-state"
 import {
@@ -984,13 +985,24 @@ export function createSessionTimelineRowRenderer(input: {
       }
 
       const status = createMemo(() => {
-        const retry = (
+        const assistant = (
           input.projection.assistantMessagesByParent().get(current().userMessageID) ?? emptyAssistantMessages
-        ).at(-1)?.retry
+        ).at(-1)
 
-        if (!retry) return input.status()
+        const retry = assistant?.retry
 
-        return { type: "retry" as const, attempt: retry.attempt, message: retry.error.message, next: retry.at }
+        if (!assistant || !retry) return input.status()
+
+        const providerID = assistant.model.providerID
+
+        const message =
+          retry.error.type === "provider.rate-limit"
+            ? i18n.t("ui.sessionTurn.retry.rateLimited", {
+                provider: data.store.provider?.all?.get(providerID)?.name ?? providerID,
+              })
+            : retry.error.message
+
+        return { type: "retry" as const, attempt: retry.attempt, message, next: retry.at }
       })
 
       return (
@@ -1013,7 +1025,12 @@ export function createSessionTimelineRowRenderer(input: {
     return (
       <Frame row={current()}>
         <div data-slot="session-turn-message-container" class={`w-full ${padding()}`}>
-          <SessionError message={current().text} />
+          <Show
+            when={current().kind === "free-limit" && input.actions?.freeLimit}
+            fallback={<SessionError message={current().text} />}
+          >
+            {(actions) => <SessionFreeLimit resetAt={current().resetAt} actions={actions()} />}
+          </Show>
         </div>
       </Frame>
     )

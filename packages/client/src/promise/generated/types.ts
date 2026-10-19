@@ -108,7 +108,13 @@ export type ToolTextContent = { type: "text"; text: string }
 
 export type ToolFileContent = { type: "file"; uri: string; mime: string; name?: string | null }
 
-export type SessionStructuredError = { type: string; message: string; status?: number; response?: { body: string } }
+export type SessionStructuredError = {
+  type: string
+  message: string
+  status?: number
+  response?: { body: string }
+  retryAfterMs?: number
+}
 
 export type SessionActive = { type: "running" }
 
@@ -3457,6 +3463,7 @@ export type SessionImportInput = {
                         readonly message: string
                         readonly status?: number
                         readonly response?: { readonly body: string }
+                        readonly retryAfterMs?: number
                       }
                       readonly content?: readonly [
                         (
@@ -3499,6 +3506,7 @@ export type SessionImportInput = {
             readonly message: string
             readonly status?: number
             readonly response?: { readonly body: string }
+            readonly retryAfterMs?: number
           }
           readonly retry?: {
             readonly attempt: number
@@ -3508,6 +3516,7 @@ export type SessionImportInput = {
               readonly message: string
               readonly status?: number
               readonly response?: { readonly body: string }
+              readonly retryAfterMs?: number
             }
           }
         }
@@ -3565,6 +3574,7 @@ export type SessionImportInput = {
                 readonly message: string
                 readonly status?: number
                 readonly response?: { readonly body: string }
+                readonly retryAfterMs?: number
               }
               readonly cost?: number
               readonly tokens?: {
@@ -3586,6 +3596,7 @@ export type SessionImportInput = {
             readonly message: string
             readonly status?: number
             readonly response?: { readonly body: string }
+            readonly retryAfterMs?: number
           }
         }
     >
@@ -3800,6 +3811,7 @@ export type SessionImportInput = {
                         readonly message: string
                         readonly status?: number
                         readonly response?: { readonly body: string }
+                        readonly retryAfterMs?: number
                       }
                       readonly content?: readonly [
                         (
@@ -3842,6 +3854,7 @@ export type SessionImportInput = {
             readonly message: string
             readonly status?: number
             readonly response?: { readonly body: string }
+            readonly retryAfterMs?: number
           }
           readonly retry?: {
             readonly attempt: number
@@ -3851,6 +3864,7 @@ export type SessionImportInput = {
               readonly message: string
               readonly status?: number
               readonly response?: { readonly body: string }
+              readonly retryAfterMs?: number
             }
           }
         }
@@ -3908,6 +3922,7 @@ export type SessionImportInput = {
                 readonly message: string
                 readonly status?: number
                 readonly response?: { readonly body: string }
+                readonly retryAfterMs?: number
               }
               readonly cost?: number
               readonly tokens?: {
@@ -3929,6 +3944,7 @@ export type SessionImportInput = {
             readonly message: string
             readonly status?: number
             readonly response?: { readonly body: string }
+            readonly retryAfterMs?: number
           }
         }
     >
@@ -4143,6 +4159,7 @@ export type SessionImportInput = {
                         readonly message: string
                         readonly status?: number
                         readonly response?: { readonly body: string }
+                        readonly retryAfterMs?: number
                       }
                       readonly content?: readonly [
                         (
@@ -4185,6 +4202,7 @@ export type SessionImportInput = {
             readonly message: string
             readonly status?: number
             readonly response?: { readonly body: string }
+            readonly retryAfterMs?: number
           }
           readonly retry?: {
             readonly attempt: number
@@ -4194,6 +4212,7 @@ export type SessionImportInput = {
               readonly message: string
               readonly status?: number
               readonly response?: { readonly body: string }
+              readonly retryAfterMs?: number
             }
           }
         }
@@ -4251,6 +4270,7 @@ export type SessionImportInput = {
                 readonly message: string
                 readonly status?: number
                 readonly response?: { readonly body: string }
+                readonly retryAfterMs?: number
               }
               readonly cost?: number
               readonly tokens?: {
@@ -4272,6 +4292,7 @@ export type SessionImportInput = {
             readonly message: string
             readonly status?: number
             readonly response?: { readonly body: string }
+            readonly retryAfterMs?: number
           }
         }
     >

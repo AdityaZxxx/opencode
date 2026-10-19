@@ -4,7 +4,7 @@ import { useDialog } from "@opencode/ui/context/dialog"
 import { isScrollKeyTarget, scrollKey, scrollKeyOwner } from "@opencode/ui/scroll-view"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { useNavigate } from "@solidjs/router"
-import { createEffect, createMemo, on, onMount, Show, type Accessor } from "solid-js"
+import { createEffect, createMemo, on, onCleanup, onMount, Show, type Accessor } from "solid-js"
 import { Composer } from "@/composer/composer"
 import { useComposerState } from "@/composer/persistence"
 import { createComposerControls } from "@/composer/selection"
@@ -190,6 +190,33 @@ export function createActiveSessionRegion(input: {
 
   const revertMessage: NonNullable<SessionUserActions["revert"]> = ({ messageID }) => revert.to(messageID)
 
+  const freeLimit: NonNullable<SessionUserActions["freeLimit"]> = {
+    upgrade: () => {
+      void import("@/providers/connect/dialog").then((connect) => {
+        const controller = connect.useProviderConnectController()
+        controller.select("opencode-go")
+        void dialog.show(() => (
+          <connect.DialogConnectProvider directory={location().directory} controller={controller} />
+        ))
+      })
+    },
+    chooseModel: () => command.trigger("model.choose"),
+    connectProvider: () => command.trigger("provider.connect"),
+  }
+
+  // The free allowance stops a prompt after it was sent. Hand its text back so switching models and resending is one
+  // step, unless the user has already started typing something else.
+  onCleanup(
+    location().event.on("session.step.failed", (event) => {
+      if (event.data.sessionID !== input.session.identity.params.id) return
+
+      if (event.data.error.type !== "provider.free-limit" || promptLength(prompt.current()) > 0) return
+      const message = input.session.history.userMessages().at(-1)
+
+      if (message) revert.recall(message)
+    }),
+  )
+
   const notifyFailed = () => {
     showToast({ title: language.t("common.requestFailed") })
   }
@@ -281,6 +308,7 @@ export function createActiveSessionRegion(input: {
           return pendingSteer
         },
         openAttachment,
+        freeLimit,
       } satisfies SessionUserActions,
     },
     requests: state,

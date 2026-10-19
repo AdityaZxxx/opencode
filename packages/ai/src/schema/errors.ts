@@ -83,7 +83,13 @@ export class RateLimitError extends Schema.TaggedError<RateLimitError>("AI.Error
 
 export class QuotaExceededError extends Schema.TaggedError<QuotaExceededError>("AI.Error.QuotaExceeded")(
   "QuotaExceeded",
-  ReasonFields,
+  {
+    ...ReasonFields,
+    // OpenCode Zen's daily allowance for anonymous free models, as opposed to a paid account cap.
+    classification: Schema.optional(Schema.Literals(["free-usage"])),
+    // When the allowance resets, from the provider's `retry-after`. Quota failures are never retried automatically.
+    retryAfterMs: Schema.optional(Schema.Number),
+  },
 ) {}
 
 export class ContentPolicyError extends Schema.TaggedError<ContentPolicyError>("AI.Error.ContentPolicy")(

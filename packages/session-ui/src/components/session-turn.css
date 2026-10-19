@@ -115,6 +115,44 @@
     }
   }
 
+  [data-component="session-free-limit"] {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    background: var(--v2-background-bg-layer-01);
+    box-shadow: inset 0 0 0 1px var(--v2-border-border-muted);
+    font-family: var(--v2-font-family-sans);
+    font-size: 13px;
+    line-height: var(--line-height-compact);
+    letter-spacing: -0.04px;
+
+    [data-slot="session-free-limit-text"] {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    [data-slot="session-free-limit-title"] {
+      color: var(--v2-text-text-base);
+      font-weight: 530;
+    }
+
+    [data-slot="session-free-limit-description"] {
+      color: var(--v2-text-text-muted);
+      font-weight: 440;
+      text-wrap: pretty;
+    }
+
+    [data-slot="session-free-limit-actions"] {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+  }
+
   [data-component="card"][data-kind="session-error-card"] {
     --card-pad-y: 0px;
     --card-pad-l: 0px;

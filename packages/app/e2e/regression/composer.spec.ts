@@ -4,6 +4,51 @@ import { openDraft, openSession } from "../utils/workspace"
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] })
 
+test("the free usage limit offers ways forward and hands the prompt back", async ({ page }) => {
+  const sessionID = "ses_free_limit"
+  const model = { id: "big-pickle", providerID: "opencode" }
+
+  const view = await openSession(page, {
+    name: "FreeLimit",
+    sessions: [{ id: sessionID, agent: "build", model }],
+    pageMessages: () => ({
+      items: [
+        { id: "msg_free_user", type: "user", text: "Refactor the parser", time: { created: T0 } },
+        { id: "msg_free_assistant", type: "assistant", agent: "build", model, content: [], time: { created: T0 + 1 } },
+      ],
+    }),
+  })
+
+  await expect(page.getByText("Refactor the parser", { exact: true })).toBeVisible()
+
+  await view.push([
+    {
+      id: "evt_free_limit",
+      created: T0 + 2,
+      type: "session.step.failed",
+      location: { directory: view.directory },
+      durable: { aggregateID: sessionID, seq: 1, version: 1 },
+      data: {
+        sessionID,
+        assistantMessageID: "msg_free_assistant",
+        error: {
+          type: "provider.free-limit",
+          message: "Free usage limit reached.",
+          status: 429,
+          retryAfterMs: 3_600_000,
+        },
+      },
+    },
+  ])
+
+  const notice = page.getByRole("status").filter({ hasText: "You've used today's free messages" })
+  await expect(notice).toBeVisible()
+  await expect(view.editor).toHaveText("Refactor the parser")
+  await expect(page.getByText("Free usage limit reached.")).toHaveCount(0)
+  await notice.getByRole("button", { name: "Use another model", exact: true }).click()
+  await expect(page.getByRole("dialog", { name: "Select model" })).toBeVisible()
+})
+
 test("a catalog refresh cannot replace an existing session's model", async ({ page }) => {
   const alpha = { id: "alpha", name: "Alpha", variants: { high: {} } }
   const beta = { id: "beta", name: "Beta" }

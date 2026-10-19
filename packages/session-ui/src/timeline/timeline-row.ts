@@ -57,9 +57,12 @@ export namespace TimelineRow {
     ref: PartRef
   }> {}
 
+  /** `free-limit` marks OpenCode Zen's daily free allowance running out; `resetAt` is when it comes back, if known. */
   export class Error extends Data.TaggedClass("Error")<{
     userMessageID: string
     text: string
+    kind?: "free-limit"
+    resetAt?: number
   }> {}
 
   export class Retry extends Data.TaggedClass("Retry")<{
@@ -142,7 +145,7 @@ export type TimelineRowMap = {
   }
   Thinking: { userMessageID: string; ref: PartRef }
   Retry: { userMessageID: string }
-  Error: { userMessageID: string; text: string }
+  Error: { userMessageID: string; text: string; kind?: "free-limit"; resetAt?: number }
   CompactionQueued: { userMessageID: string; inboxID: string }
   TurnDiff: { userMessageID: string; messageID: string; from: string; files: readonly string[] }
   Activity: { userMessageID: string }

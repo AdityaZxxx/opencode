@@ -71,6 +71,27 @@ describe("toSessionError", () => {
     expect(toSessionError(llm(new UnknownProviderError({ message: "unknown" }))).type).toBe("provider.unknown")
   })
 
+  test("separates the free usage limit from paid quota and keeps its reset delay", () => {
+    const body = '{"type":"error","error":{"type":"FreeUsageLimitError","message":"Rate limit exceeded."}}'
+    const free = toSessionError(
+      llm(
+        new QuotaExceededError({
+          message: "Rate limit exceeded. Please try again later.",
+          body,
+          classification: "free-usage",
+          retryAfterMs: 3_600_000,
+          http: new HttpContext({ url: "https://opencode.ai/zen/v1", status: 429, headers: {} }),
+        }),
+      ),
+    )
+    expect(free).toMatchObject({ type: "provider.free-limit", status: 429, retryAfterMs: 3_600_000 })
+    expect(free.message).not.toContain("try again later")
+    expect(toSessionError(llm(new QuotaExceededError({ message: "Go usage limit exceeded" })))).toEqual({
+      type: "provider.quota",
+      message: "Go usage limit exceeded",
+    })
+  })
+
   test("preserves the permission rejection type without exposing internal fields", () => {
     const blocked = new Permission.BlockedError({ rules: [], permission: "external_directory", resources: [] })
     expect(toSessionError(blocked)).toEqual({

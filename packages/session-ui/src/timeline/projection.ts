@@ -564,7 +564,11 @@ export namespace Timeline {
       if (isActive && lastAssistant?.retry) rows.push(new TimelineRow.Retry({ userMessageID: turnID }))
       else if (lastAssistant?.error && !isInterrupted(lastAssistant.error))
         rows.push(
-          new TimelineRow.Error({ userMessageID: turnID, text: unwrapErrorMessage(lastAssistant.error.message) }),
+          new TimelineRow.Error({
+            userMessageID: turnID,
+            text: unwrapErrorMessage(lastAssistant.error.message),
+            ...freeLimit(lastAssistant),
+          }),
         )
     }
 
@@ -584,6 +588,7 @@ export namespace Timeline {
               new TimelineRow.Error({
                 userMessageID: turnID,
                 text: unwrapErrorMessage(entry.message.error.message),
+                ...freeLimit(entry.message),
               }),
             )
 
@@ -632,6 +637,17 @@ export namespace Timeline {
       content,
     }))
   }
+}
+
+function freeLimit(
+  message: Pick<SessionMessageAssistant, "error"> & { time: { created: number; completed?: number } },
+) {
+  if (message.error?.type !== "provider.free-limit") return {}
+  const delay = message.error.retryAfterMs
+
+  if (delay === undefined) return { kind: "free-limit" as const }
+
+  return { kind: "free-limit" as const, resetAt: (message.time.completed ?? message.time.created) + delay }
 }
 
 function isInterrupted(error: SessionMessageAssistant["error"]) {

@@ -67,6 +67,38 @@ describe("RequestExecutor", () => {
     }),
   )
 
+  it.effect("keeps the reset time of an OpenCode Zen free usage limit", () =>
+    Effect.sync(() => {
+      // The exact response OpenCode Zen sends when an anonymous free allowance runs out.
+      const body = JSON.stringify({
+        type: "error",
+        error: { type: "FreeUsageLimitError", message: "Rate limit exceeded. Please try again later." },
+      })
+      const free = RequestExecutor.httpFailure({
+        message: "Rate limit exceeded. Please try again later.",
+        url: request.url,
+        status: 429,
+        responseHeaders: { "retry-after": "3600" },
+        responseBody: body,
+      })
+      const paid = RequestExecutor.httpFailure({
+        message: "Go usage limit exceeded",
+        url: request.url,
+        status: 429,
+        responseBody: JSON.stringify({ type: "error", error: { type: "GoUsageLimitError", message: "x" } }),
+      })
+
+      expect(free.reason).toMatchObject({
+        _tag: "QuotaExceeded",
+        classification: "free-usage",
+        retryAfterMs: 3_600_000,
+      })
+      expect(isRetryable(free)).toBe(false)
+      expect(paid.reason._tag).toBe("QuotaExceeded")
+      expect(paid.reason._tag === "QuotaExceeded" && paid.reason.classification).toBeUndefined()
+    }),
+  )
+
   it.effect("retains the original body-read failure on an HTTP status error", () =>
     Effect.gen(function* () {
       const cause = new Error("response body disconnected")

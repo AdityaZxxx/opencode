@@ -37,4 +37,10 @@ export type SessionUserActions = {
     queue: (input: { sessionID: string; messageID: string }) => Promise<void>
     remove: (input: { sessionID: string; messageID: string }) => Promise<void>
   }
+  /** Ways forward once OpenCode's free daily allowance runs out. Without them the limit shows as plain text. */
+  freeLimit?: {
+    upgrade: () => void
+    chooseModel: () => void
+    connectProvider: () => void
+  }
 }

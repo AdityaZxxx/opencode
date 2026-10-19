@@ -25,6 +25,10 @@ const tokenSharingMessages = {
     "This ChatGPT connection isn't authorized for this request. Reconnect to ChatGPT or choose another connection.",
 }
 
+// Zen reports the free allowance as a generic rate limit; clients that know `provider.free-limit` show their own copy.
+const FREE_USAGE_LIMIT_MESSAGE =
+  "Free usage limit reached. Connect a provider or subscribe to OpenCode Go to keep going, or switch models."
+
 export function toSessionError(cause: unknown): SessionError.Error {
   if (cause instanceof AIError) {
     switch (cause.reason._tag) {
@@ -33,6 +37,12 @@ export function toSessionError(cause: unknown): SessionError.Error {
       case "Authentication":
         return providerError("provider.auth", cause.reason)
       case "QuotaExceeded":
+        if (cause.reason.classification === "free-usage")
+          return {
+            ...providerError("provider.free-limit", cause.reason),
+            message: FREE_USAGE_LIMIT_MESSAGE,
+            ...(cause.reason.retryAfterMs === undefined ? {} : { retryAfterMs: Math.ceil(cause.reason.retryAfterMs) }),
+          }
         return providerError("provider.quota", cause.reason)
       case "ContentPolicy":
         return providerError("provider.content-filter", cause.reason)

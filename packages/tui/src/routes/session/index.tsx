@@ -390,6 +390,17 @@ export function Session(props: {
     seeded = true
     r.set(route.prompt)
   }
+  // The free allowance stops a prompt after it was sent. Hand its text back so switching models and resending is one
+  // step, unless something else is already being typed.
+  onCleanup(
+    data.on("session.step.failed", (event) => {
+      const current = prompt()
+      if (event.data.sessionID !== route.sessionID || event.data.error.type !== "provider.free-limit") return
+      if (!current || current.current.text.trim()) return
+      const message = messages().findLast((item) => item.type === "user")
+      if (message?.type === "user") current.set({ ...projectedPromptInput(message), pasted: [] })
+    }),
+  )
 
   /** Runs after layout has settled (two frames), unless the transcript was torn down. */
   const afterLayout = (continuation: () => void) => {
@@ -1906,14 +1917,22 @@ function AssistantFooter(props: { message: SessionMessageAssistant }) {
     turnTokensPerSecond(props.message, messages(), ctx.messageIndex(props.message.id), ctx.legacyTurns()),
   )
   const interrupted = createMemo(() => props.message.error?.message === "Step interrupted")
+  const freeLimit = createMemo(() => props.message.error?.type === "provider.free-limit")
   return (
     <>
       <Show when={props.message.error && !interrupted() && !props.message.retry}>
-        <box paddingLeft={3}>
-          <text fg={theme.text.feedback.error.base}>Error: {errorMessage(props.message.error)}</text>
-        </box>
+        <Show
+          when={freeLimit()}
+          fallback={
+            <box paddingLeft={3}>
+              <text fg={theme.text.feedback.error.base}>Error: {errorMessage(props.message.error)}</text>
+            </box>
+          }
+        >
+          <FreeLimitNotice message={props.message} />
+        </Show>
       </Show>
-      <AssistantRetry retry={props.message.retry} />
+      <AssistantRetry retry={props.message.retry} providerID={props.message.model.providerID} />
       <box paddingLeft={3} marginTop={props.message.retry || (props.message.error && !interrupted()) ? 1 : 0}>
         <text>
           <span style={{ fg: props.message.error ? theme.text.muted : local.agent.color(props.message.agent) }}>
@@ -2382,8 +2401,44 @@ function QueuedPromptDock(props: { prompts: { id: string; text: string }[]; onOp
   )
 }
 
-function AssistantRetry(props: { retry: SessionMessageAssistant["retry"] }) {
+// OpenCode's free daily allowance ran out. An expected limit, so it reads as next steps rather than an error.
+function FreeLimitNotice(props: { message: SessionMessageAssistant }) {
   const theme = useTheme()
+  const reset = createMemo(() => {
+    const delay = props.message.error?.retryAfterMs
+    if (delay === undefined) return
+    const at = (props.message.time.completed ?? props.message.time.created) + delay
+    // The allowance resets within a day; anything further out needs the date too.
+    return at - Date.now() < 86_400_000 ? Locale.time(at) : Locale.datetime(at)
+  })
+  return (
+    <box paddingLeft={3} flexDirection="column">
+      <text fg={theme.text.base}>
+        <span style={{ attributes: TextAttributes.BOLD }}>You've used today's free messages</span>
+        <Show when={reset()}>{(time) => <span style={{ fg: theme.text.muted }}> · resets at {time()}</span>}</Show>
+      </text>
+      <text fg={theme.text.muted}>
+        <span style={{ fg: theme.text.base }}>/connect</span> upgrade to OpenCode Go or add a provider ·{" "}
+        <span style={{ fg: theme.text.base }}>/models</span> switch model
+      </text>
+    </box>
+  )
+}
+
+function AssistantRetry(props: { retry: SessionMessageAssistant["retry"]; providerID: string }) {
+  const theme = useTheme()
+  const ctx = use()
+  const data = useData()
+  const reason = createMemo(() => {
+    const retry = props.retry
+    if (!retry) return ""
+    if (retry.error.type !== "provider.rate-limit") return retry.error.message
+    const location = data.session.get(ctx.sessionID)?.location
+    const provider = location
+      ? data.location.provider.list(location)?.find((item) => item.id === props.providerID)?.name
+      : undefined
+    return `Rate limited by ${provider ?? props.providerID}`
+  })
   const [seconds, setSeconds] = createSignal(0)
   createEffect(() => {
     const at = props.retry?.at
@@ -2400,8 +2455,7 @@ function AssistantRetry(props: { retry: SessionMessageAssistant["retry"] }) {
       {(retry) => (
         <box paddingLeft={3}>
           <text fg={theme.text.feedback.warning.base}>
-            ⚠ {seconds() > 0 ? `Retrying in ${seconds()}s` : "Retry due"} · attempt {retry().attempt} ·{" "}
-            {retry().error.message}
+            ⚠ {seconds() > 0 ? `Retrying in ${seconds()}s` : "Retry due"} · attempt {retry().attempt} · {reason()}
           </text>
         </box>
       )}

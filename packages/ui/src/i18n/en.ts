@@ -75,6 +75,14 @@ const source = {
   "ui.sessionTurn.retry.attemptWaiting.other": "Attempt {{attempt}} - retrying in {{count}}s",
   "ui.sessionTurn.retry.attemptRetryingNow": "Attempt {{attempt}} - retrying",
   "ui.sessionTurn.retry.geminiHot": "gemini is way too hot right now",
+  "ui.sessionTurn.retry.rateLimited": "Rate limited by {{provider}}",
+  "ui.sessionTurn.freeLimit.title": "You've used today's free messages",
+  "ui.sessionTurn.freeLimit.description": "Upgrade to OpenCode Go to keep going now, or switch to another model.",
+  "ui.sessionTurn.freeLimit.descriptionReset":
+    "Free messages reset at {{time}}. Upgrade to OpenCode Go to keep going now, or switch to another model.",
+  "ui.sessionTurn.freeLimit.upgrade": "Upgrade to Go",
+  "ui.sessionTurn.freeLimit.chooseModel": "Use another model",
+  "ui.sessionTurn.freeLimit.connectProvider": "Connect provider",
   "ui.sessionTurn.error.freeUsageExceeded": "Free usage exceeded",
   "ui.sessionTurn.error.addCredits": "Add credits",
 
