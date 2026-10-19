@@ -4,6 +4,55 @@ import { openDraft, openSession } from "../utils/workspace"
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] })
 
+test("a retired model offers another model and hands the prompt back", async ({ page }) => {
+  const sessionID = "ses_model_retired"
+  const model = { id: "muse-spark-1.3-contributor-free", providerID: "opencode" }
+  // The prompt comes back only for a failure that just happened.
+  const now = Date.now()
+
+  const view = await openSession(page, {
+    name: "ModelRetired",
+    sessions: [{ id: sessionID, agent: "build", model }],
+    pageMessages: () => ({
+      items: [
+        { id: "msg_retired_user", type: "user", text: "Refactor the parser", time: { created: now } },
+        {
+          id: "msg_retired_assistant",
+          type: "assistant",
+          agent: "build",
+          model,
+          content: [],
+          time: { created: now + 1 },
+        },
+      ],
+    }),
+  })
+
+  await expect(page.getByText("Refactor the parser", { exact: true })).toBeVisible()
+
+  await view.push([
+    {
+      id: "evt_model_retired",
+      created: now + 2,
+      type: "session.step.failed",
+      location: { directory: view.directory },
+      durable: { aggregateID: sessionID, seq: 1, version: 1 },
+      data: {
+        sessionID,
+        assistantMessageID: "msg_retired_assistant",
+        error: { type: "provider.model-retired", message: "This model was retired, pick another", status: 410 },
+      },
+    },
+  ])
+
+  const notice = page.getByRole("status").filter({ hasText: "This model was retired" })
+  await expect(notice).toBeVisible()
+  await expect(page.getByText("This model was retired, pick another")).toHaveCount(0)
+  await expect(view.editor).toHaveText("Refactor the parser")
+  await notice.getByRole("button", { name: "Pick another model", exact: true }).click()
+  await expect(page.getByRole("dialog", { name: "Select model" })).toBeVisible()
+})
+
 test("a catalog refresh cannot replace an existing session's model", async ({ page }) => {
   const alpha = { id: "alpha", name: "Alpha", variants: { high: {} } }
   const beta = { id: "beta", name: "Beta" }

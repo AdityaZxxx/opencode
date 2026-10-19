@@ -37,4 +37,8 @@ export type SessionUserActions = {
     queue: (input: { sessionID: string; messageID: string }) => Promise<void>
     remove: (input: { sessionID: string; messageID: string }) => Promise<void>
   }
+  /** The way past a model the provider retired. Without it the failure shows as plain text. */
+  modelRetired?: {
+    chooseModel: () => void
+  }
 }

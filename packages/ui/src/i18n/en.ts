@@ -75,6 +75,9 @@ const source = {
   "ui.sessionTurn.retry.attemptWaiting.other": "Attempt {{attempt}} - retrying in {{count}}s",
   "ui.sessionTurn.retry.attemptRetryingNow": "Attempt {{attempt}} - retrying",
   "ui.sessionTurn.retry.geminiHot": "gemini is way too hot right now",
+  "ui.sessionTurn.modelRetired.title": "This model was retired",
+  "ui.sessionTurn.modelRetired.description": "Pick another model to send your message again.",
+  "ui.sessionTurn.modelRetired.chooseModel": "Pick another model",
   "ui.sessionTurn.error.freeUsageExceeded": "Free usage exceeded",
   "ui.sessionTurn.error.addCredits": "Add credits",
 

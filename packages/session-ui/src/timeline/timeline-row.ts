@@ -57,9 +57,11 @@ export namespace TimelineRow {
     ref: PartRef
   }> {}
 
+  /** `model-retired` marks a step the provider refused because it no longer serves the model. */
   export class Error extends Data.TaggedClass("Error")<{
     userMessageID: string
     text: string
+    kind?: "model-retired"
   }> {}
 
   export class Retry extends Data.TaggedClass("Retry")<{
@@ -142,7 +144,7 @@ export type TimelineRowMap = {
   }
   Thinking: { userMessageID: string; ref: PartRef }
   Retry: { userMessageID: string }
-  Error: { userMessageID: string; text: string }
+  Error: { userMessageID: string; text: string; kind?: "model-retired" }
   CompactionQueued: { userMessageID: string; inboxID: string }
   TurnDiff: { userMessageID: string; messageID: string; from: string; files: readonly string[] }
   Activity: { userMessageID: string }

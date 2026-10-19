@@ -137,11 +137,22 @@ describe("toSessionError", () => {
         ),
       ),
     ).toEqual({
-      type: "provider.invalid-request",
+      type: "provider.model-retired",
       message: "This model was retired, pick another",
       status: 410,
       response: { body: "Model muse-spark-1.3-contributor-free has been deprecated." },
     })
+    // The status decides, whichever reason the provider's 410 was decoded as.
+    expect(
+      toSessionError(
+        llm(
+          new ProviderInternalError({
+            message: "gone",
+            http: new HttpContext({ url: "https://example.com", status: 410, headers: {} }),
+          }),
+        ),
+      ).type,
+    ).toBe("provider.model-retired")
   })
 
   test("preserves provider response body without HTTP status", () => {

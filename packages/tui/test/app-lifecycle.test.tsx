@@ -1701,6 +1701,67 @@ test("server plugin failures share one notice and use source names before an ID 
   expect(setup.captureCharFrame()).toContain("Open plugins")
 })
 
+test("a retired model points to /models and hands the prompt back", async () => {
+  await using state = await tmpdir()
+  const session = {
+    id: "ses_model_retired",
+    projectID: "proj_test",
+    location: { directory },
+    title: "Retired model",
+    cost: 0,
+    tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    time: { created: 1, updated: 1 },
+  }
+  const model = { id: "muse-spark-1.3-contributor-free", providerID: "opencode" }
+  await using setup = await createAppFixture({
+    width: 100,
+    state: state.path,
+    args: { sessionID: session.id },
+    config: { animations: false, tabs: { mode: "off" } },
+    fetch: (url) => {
+      if (url.pathname === "/api/session") return json({ data: [session], cursor: {} })
+      if (url.pathname === `/api/session/${session.id}`) return json({ data: session })
+      if (url.pathname === `/api/session/${session.id}/message`)
+        return json({
+          data: [
+            { id: "msg_retired_user", type: "user", text: "Refactor the parser", time: { created: 1 } },
+            {
+              id: "msg_retired_assistant",
+              type: "assistant",
+              agent: "build",
+              model,
+              content: [],
+              time: { created: 2 },
+            },
+          ],
+          cursor: {},
+        })
+      if ([`/api/session/${session.id}/inbox`, `/api/session/${session.id}/permission`].includes(url.pathname))
+        return json({ data: [] })
+      return undefined
+    },
+  })
+  await setup.ready
+  await setup.waitForFrame((frame) => frame.includes("Refactor the parser"))
+  setup.events.emit({
+    id: "evt_model_retired",
+    created: 3,
+    type: "session.step.failed",
+    durable: { aggregateID: session.id, seq: 1, version: 1 },
+    data: {
+      sessionID: session.id,
+      assistantMessageID: "msg_retired_assistant",
+      error: { type: "provider.model-retired", message: "This model was retired, pick another", status: 410 },
+    },
+  })
+  await setup.waitForFrame((frame) => frame.includes("This model was retired, pick another"))
+  const frame = setup.captureCharFrame()
+  expect(frame).toMatch(/^ +\/models *$/m)
+  expect(frame).not.toContain("Error:")
+  // The prompt shows once in the transcript and once more back in the composer.
+  await setup.waitForFrame((frame) => frame.split("Refactor the parser").length === 3)
+})
+
 test.each([44, 100])(
   "retry countdown updates and clears with the retry lifecycle at width %s",
   async (width) => {

@@ -564,7 +564,11 @@ export namespace Timeline {
       if (isActive && lastAssistant?.retry) rows.push(new TimelineRow.Retry({ userMessageID: turnID }))
       else if (lastAssistant?.error && !isInterrupted(lastAssistant.error))
         rows.push(
-          new TimelineRow.Error({ userMessageID: turnID, text: unwrapErrorMessage(lastAssistant.error.message) }),
+          new TimelineRow.Error({
+            userMessageID: turnID,
+            text: unwrapErrorMessage(lastAssistant.error.message),
+            ...errorKind(lastAssistant.error),
+          }),
         )
     }
 
@@ -584,6 +588,7 @@ export namespace Timeline {
               new TimelineRow.Error({
                 userMessageID: turnID,
                 text: unwrapErrorMessage(entry.message.error.message),
+                ...errorKind(entry.message.error),
               }),
             )
 
@@ -632,6 +637,13 @@ export namespace Timeline {
       content,
     }))
   }
+}
+
+// A failure the transcript can offer a way past, decided by its type rather than its wording.
+function errorKind(error: SessionMessageAssistant["error"]) {
+  if (error?.type === "provider.model-retired") return { kind: "model-retired" as const }
+
+  return {}
 }
 
 function isInterrupted(error: SessionMessageAssistant["error"]) {

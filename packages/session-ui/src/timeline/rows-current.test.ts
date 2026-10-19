@@ -1453,6 +1453,47 @@ describe("current session timeline rows", () => {
     )
   })
 
+  test("marks a retired model by its error type, whichever message records the failure", () => {
+    const error = { type: "provider.model-retired", message: "This model was retired, pick another", status: 410 }
+    const user = { id: "msg_user", type: "user", text: "prompt", time: { created: 1 } } satisfies SessionMessageInfo
+
+    const assistant = {
+      id: "msg_assistant",
+      type: "assistant",
+      agent: "build",
+      model: { id: "muse-spark-1.3-contributor-free", providerID: "opencode" },
+      content: [],
+      finish: "error",
+      error,
+      time: { created: 2, completed: 3 },
+    } satisfies SessionMessageAssistant
+
+    const idle = [
+      user,
+      { id: "msg_idle", type: "idle", outcome: "failed", error, time: { created: 4 } },
+    ] satisfies SessionMessageInfo[]
+
+    // The same words under another type stay a plain error.
+    const invalid = [
+      user,
+      { ...assistant, error: { type: "provider.invalid-request", message: "This model was retired, pick another" } },
+    ] satisfies SessionMessageInfo[]
+
+    expect(Timeline.constructSessionMessageRows([user, assistant], true, { type: "idle" }).rows.at(-1)).toEqual(
+      new TimelineRow.Error({
+        userMessageID: "msg_user",
+        text: "This model was retired, pick another",
+        kind: "model-retired",
+      }),
+    )
+    expect(Timeline.constructSessionMessageRows(idle, true, { type: "idle" }).rows.at(-1)).toMatchObject({
+      kind: "model-retired",
+    })
+    expect(Timeline.constructSessionMessageRows(invalid, true, { type: "idle" }).rows.at(-1)).toEqual(
+      new TimelineRow.Error({ userMessageID: "msg_user", text: "This model was retired, pick another" }),
+    )
+  })
+
   test("summarizes a turn's changed files after the idle marker that ends it", () => {
     const step = (id: string, files?: string[]) =>
       ({

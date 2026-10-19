@@ -34,6 +34,8 @@ import { createSessionRequestModel } from "../requests/model"
 import type { Region } from "@/runtime/extension/panels"
 import { SessionLocationMissing } from "./location-missing"
 
+const RECALL_WINDOW = 60_000
+
 export function createActiveSessionRegion(input: {
   session: SessionModel
   screen: SessionScreenLayout
@@ -190,6 +192,36 @@ export function createActiveSessionRegion(input: {
 
   const revertMessage: NonNullable<SessionUserActions["revert"]> = ({ messageID }) => revert.to(messageID)
 
+  const modelRetired: NonNullable<SessionUserActions["modelRetired"]> = {
+    chooseModel: () => command.trigger("model.choose"),
+  }
+
+  // A retired model fails the prompt after it was sent. Hand its text back so picking another model and resending is
+  // one step, unless the user has already started typing something else. This follows the transcript rather than the
+  // failure event: a first prompt from a draft can fail before this session's screen mounts.
+  const recalled = new Set<string>()
+
+  const retiredPrompt = createMemo(() => {
+    const last = input.session.history.messages().at(-1)
+    const error = last?.type === "assistant" || last?.type === "idle" ? last.error : undefined
+
+    if (!last || error?.type !== "provider.model-retired") return
+
+    // Only a failure that just happened, so reopening an old session leaves the composer alone.
+    if (Date.now() - last.time.created > RECALL_WINDOW) return
+
+    return input.session.history.userMessages().at(-1)
+  })
+
+  createEffect(
+    on(retiredPrompt, (message) => {
+      if (!message || recalled.has(message.id)) return
+      recalled.add(message.id)
+
+      if (promptLength(prompt.current()) === 0) revert.recall(message)
+    }),
+  )
+
   const notifyFailed = () => {
     showToast({ title: language.t("common.requestFailed") })
   }
@@ -281,6 +313,7 @@ export function createActiveSessionRegion(input: {
           return pendingSteer
         },
         openAttachment,
+        modelRetired,
       } satisfies SessionUserActions,
     },
     requests: state,
