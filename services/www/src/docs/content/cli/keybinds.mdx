@@ -325,17 +325,24 @@ The retired `diff.toggle`, `diff.expand`, `diff.expand_all`, `diff.collapse`, an
 
 ## Composer
 
-| ID                            | Default  | Description          |
-| ----------------------------- | -------- | -------------------- |
-| `composer.subagent.up`        | `up`     | Previous subagent    |
-| `composer.subagent.down`      | `down`   | Next subagent        |
-| `composer.subagent.select`    | `return` | Navigate to subagent |
-| `composer.subagent.interrupt` | `ctrl+d` | Interrupt subagent   |
-| `composer.shell.up`           | `up`     | Previous shell       |
-| `composer.shell.down`         | `down`   | Next shell           |
-| `composer.shell.select`       | `return` | View shell output    |
-| `composer.shell.kill`         | `ctrl+d` | Kill shell command   |
+| ID                                  | Default  | Description             |
+| ----------------------------------- | -------- | ----------------------- |
+| `composer.tab.previous`             | `left`   | Previous composer tab   |
+| `composer.tab.next`                 | `right`  | Next composer tab       |
+| `composer.subagent.up`              | `up`     | Previous subagent       |
+| `composer.subagent.down`            | `down`   | Next subagent           |
+| `composer.subagent.select`          | `return` | Navigate to subagent    |
+| `composer.subagent.interrupt`       | `ctrl+d` | Interrupt subagent      |
+| `composer.subagent.toggle-activity` | `ctrl+a` | Toggle active subagents |
+| `composer.shell.up`                 | `up`     | Previous shell          |
+| `composer.shell.down`               | `down`   | Next shell              |
+| `composer.shell.select`             | `return` | View shell output       |
+| `composer.shell.kill`               | `ctrl+d` | Kill shell command      |
+| `composer.terminal.up`              | `up,k`   | Previous terminal       |
+| `composer.terminal.down`            | `down,j` | Next terminal           |
+| `composer.terminal.select`          | `return` | Select terminal         |
 
+Switch tabs with **←/→**, or click a tab label or the `tabs` hint in the footer.
 Select a running command in the **Shell** tab and press **Enter**, or click it, to view captured stdout and stderr.
 Use **↑/↓**, **Page Up/Down**, or **Home** to scroll, **End** to follow new output, and **Esc** to return without stopping the command.
 The viewer shows recent output and stays open after exit; output redirected to a file is not included.
