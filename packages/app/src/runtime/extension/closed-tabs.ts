@@ -31,6 +31,26 @@ export function createSideFocus() {
   return (event: Event) => inSide(event, last)
 }
 
+/** As in a browser: inside the side panel, ⌘1–8 select that side tab and ⌘9 the last one. */
+export function sideTabNumbers(input: {
+  keys: () => readonly string[]
+  select: (key: string) => void
+  when: (event: KeyboardEvent) => boolean
+}) {
+  return Array.from({ length: 9 }, (_, index) => ({
+    id: `file.tab.${index + 1}`,
+    title: "",
+    keybind: `mod+${index + 1}`,
+    hidden: true,
+    when: input.when,
+    onSelect: () => {
+      const key = index === 8 ? input.keys().at(-1) : input.keys()[index]
+
+      if (key) input.select(key)
+    },
+  }))
+}
+
 function inSide(event: Event, fallback: boolean) {
   const target = event.target
 

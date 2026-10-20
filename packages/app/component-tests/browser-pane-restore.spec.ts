@@ -92,6 +92,8 @@ story.beforeEach(async ({ mount, page }) => {
         newSession: () => void
         reopenSession: () => void
         reopenSide: () => void
+        switchSession: () => void
+        side: () => { keys: () => readonly string[]; select: (key: string) => void } | undefined
         shortcut: (shortcut: Accessor<string>) => void
       }) => {
         const command = commands.useCommand()
@@ -127,6 +129,12 @@ story.beforeEach(async ({ mount, page }) => {
             when: (event: Event) => inSide(event),
             onSelect: props.reopenSide,
           },
+          { id: "tab.2", title: "", keybind: "mod+2", hidden: true, onSelect: props.switchSession },
+          ...closed.sideTabNumbers({
+            keys: () => props.side()?.keys() ?? [],
+            select: (key: string) => props.side()?.select(key),
+            when: (event: Event) => inSide(event),
+          }),
           {
             id: "review.toggle",
             title: "Toggle review",
@@ -346,6 +354,37 @@ story("reopens a closed browser tab with ⌘⇧T after the side panel and a sess
   await reopen()
   await expect(root.getByTestId("session-reopens")).toHaveText("1")
   await expect(opens).toHaveText("1")
+})
+
+story("selects side tabs with ⌘1–9 inside the side panel and session tabs elsewhere", async ({ page }) => {
+  const root = page.getByTestId("browser-region-fixture")
+  const mod = (await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))) ? "Meta" : "Control"
+  const outside = root.getByRole("button", { name: "Beta", exact: true })
+  const panel = page.locator("#review-panel")
+  const editor = page.frameLocator('iframe[title="Browser page"]').getByRole("textbox", { name: "Editor page input" })
+  const selected = root.getByTestId("selected")
+  await expect(root.getByText("Registrations: 1", { exact: true })).toBeVisible()
+  await outside.click()
+  await root.getByRole("button", { name: "First inventory", exact: true }).click()
+  await expect(selected).toHaveText(/^browser:/)
+
+  // A native page takes focus without a DOM event; the key it forwards still lands in the side panel.
+  await outside.click()
+  await editor.press(`${mod}+1`)
+  await expect(selected).toHaveText("file://beta.ts")
+
+  await panel.press(`${mod}+2`)
+  await expect(selected).toHaveText(/^browser:/)
+  await panel.press(`${mod}+1`)
+  await expect(selected).toHaveText("file://beta.ts")
+  await panel.press(`${mod}+9`)
+  await expect(selected).toHaveText(/^browser:/)
+  await expect(root.getByTestId("session-switches")).toHaveText("0")
+
+  await outside.focus()
+  await outside.press(`${mod}+2`)
+  await expect(root.getByTestId("session-switches")).toHaveText("1")
+  await expect(selected).toHaveText(/^browser:/)
 })
 
 story("keeps a restored browser tab selected and undrawn until the desktop's first inventory", async ({ page }) => {
