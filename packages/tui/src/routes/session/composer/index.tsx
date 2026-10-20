@@ -1,4 +1,4 @@
-import { createEffect, createMemo, For, onCleanup, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { TextAttributes } from "@opentui/core"
 import { useTheme } from "../../../context/theme"
@@ -25,6 +25,7 @@ export function Composer(props: ComposerProps) {
     tabs: {} as Record<string, ComposerTab>,
     active: "",
   })
+  const [tabsHovered, setTabsHovered] = createSignal(false)
 
   const tabList = createMemo(() => Object.values(store.tabs))
   const activeTab = createMemo(() => tabList().find((t) => t.id === store.active))
@@ -52,15 +53,27 @@ export function Composer(props: ComposerProps) {
     active(id: string) {
       return props.open && store.active === id
     },
+    select(id: string) {
+      if (!store.tabs[id]) return
+      setStore("active", id)
+    },
     close,
   }
 
   const keymap = Keymap.use()
+  const shortcuts = Keymap.useShortcuts()
   createEffect(() => {
     if (!props.open) return
     const popMode = keymap.mode.push("composer")
     onCleanup(popMode)
   })
+
+  // The default bindings render as the arrow glyphs, so an untouched config keeps the original hint.
+  const tabShortcuts = createMemo(() =>
+    [shortcuts.get("composer.tab.previous"), shortcuts.get("composer.tab.next")]
+      .filter((value): value is string => !!value)
+      .join("/"),
+  )
 
   const switchTab = (dir: number) => {
     const tabs = tabList()
@@ -74,8 +87,8 @@ export function Composer(props: ComposerProps) {
     enabled: () => props.open,
     priority: 1,
     commands: [
-      { bind: "left", title: "Previous tab", group: "Composer", run: () => switchTab(-1) },
-      { bind: "right", title: "Next tab", group: "Composer", run: () => switchTab(1) },
+      { id: "composer.tab.previous", title: "Previous tab", group: "Composer", run: () => switchTab(-1) },
+      { id: "composer.tab.next", title: "Next tab", group: "Composer", run: () => switchTab(1) },
       { bind: "escape", title: "Close composer", group: "Composer", run: close },
       { bind: "ctrl+c", title: "Close composer", group: "Composer", run: close },
     ],
@@ -108,10 +121,14 @@ export function Composer(props: ComposerProps) {
                   <For each={tabList()}>
                     {(t) => {
                       const isActive = createMemo(() => store.active === t.id)
+                      const [hovered, setHovered] = createSignal(false)
                       return (
                         <text
-                          fg={isActive() ? theme.text.base : theme.text.muted}
+                          fg={isActive() || hovered() ? theme.text.base : theme.text.muted}
                           attributes={isActive() ? TextAttributes.BOLD : undefined}
+                          onMouseOver={() => setHovered(true)}
+                          onMouseOut={() => setHovered(false)}
+                          onMouseUp={() => ctx.select(t.id)}
                         >
                           {t.label}
                         </text>
@@ -131,21 +148,32 @@ export function Composer(props: ComposerProps) {
             </Show>
             <box flexDirection="row" gap={2} paddingLeft={1} flexShrink={0}>
               <For each={footerHints()}>
-                {(hint) => (
-                  <text>
-                    <span style={{ fg: theme.text.base }}>
-                      <b>{hint.label}</b>{" "}
-                    </span>
-                    <span style={{ fg: theme.text.muted }}>{hint.shortcut}</span>
-                  </text>
-                )}
+                {(hint) => {
+                  const [hovered, setHovered] = createSignal(false)
+                  return (
+                    <text
+                      onMouseOver={() => setHovered(true)}
+                      onMouseOut={() => setHovered(false)}
+                      onMouseUp={() => keymap.dispatch(hint.command)}
+                    >
+                      <span style={{ fg: theme.text.base }}>
+                        <b>{hint.label}</b>{" "}
+                      </span>
+                      <span style={{ fg: hovered() ? theme.text.base : theme.text.muted }}>{hint.shortcut}</span>
+                    </text>
+                  )
+                }}
               </For>
-              <Show when={tabList().length > 1}>
-                <text>
+              <Show when={tabList().length > 1 && tabShortcuts()}>
+                <text
+                  onMouseOver={() => setTabsHovered(true)}
+                  onMouseOut={() => setTabsHovered(false)}
+                  onMouseUp={() => keymap.dispatch("composer.tab.next")}
+                >
                   <span style={{ fg: theme.text.base }}>
                     <b>tabs</b>{" "}
                   </span>
-                  <span style={{ fg: theme.text.muted }}>←/→</span>
+                  <span style={{ fg: tabsHovered() ? theme.text.base : theme.text.muted }}>{tabShortcuts()}</span>
                 </text>
               </Show>
             </box>

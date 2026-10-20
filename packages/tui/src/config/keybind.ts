@@ -244,10 +244,13 @@ export const Definitions = {
   "prompt.history.previous": keybind("up", "Previous history item"),
   "prompt.history.next": keybind("down", "Next history item"),
 
+  "composer.tab.previous": keybind("left", "Previous composer tab"),
+  "composer.tab.next": keybind("right", "Next composer tab"),
   "composer.subagent.up": keybind("up", "Previous subagent"),
   "composer.subagent.down": keybind("down", "Next subagent"),
   "composer.subagent.select": keybind("return", "Navigate to subagent"),
   "composer.subagent.interrupt": keybind("ctrl+d", "Interrupt subagent"),
+  "composer.subagent.toggle-activity": keybind("ctrl+a", "Toggle active subagents"),
   "composer.shell.up": keybind("up", "Previous shell"),
   "composer.shell.down": keybind("down", "Next shell"),
   "composer.shell.select": keybind("return", "View shell output"),

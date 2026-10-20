@@ -3,6 +3,7 @@ import { createContext, useContext } from "solid-js"
 export interface ComposerHint {
   label: string
   shortcut: string
+  command: string
 }
 
 export interface ComposerTab {
@@ -14,6 +15,7 @@ export interface ComposerTab {
 export const ComposerContext = createContext<{
   register: (tab: ComposerTab) => () => void
   active: (id: string) => boolean
+  select: (id: string) => void
   close: () => void
 }>()
 

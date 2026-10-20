@@ -53,8 +53,16 @@ export function ShellTab(props: { sessionID: string }) {
       hints: () =>
         selectedEntry()
           ? [
-              { label: "output", shortcut: shortcuts.get("composer.shell.select") ?? "" },
-              { label: "kill", shortcut: shortcuts.get("composer.shell.kill") ?? "" },
+              {
+                label: "output",
+                shortcut: shortcuts.get("composer.shell.select") ?? "",
+                command: "composer.shell.select",
+              },
+              {
+                label: "kill",
+                shortcut: shortcuts.get("composer.shell.kill") ?? "",
+                command: "composer.shell.kill",
+              },
             ]
           : [],
     })
