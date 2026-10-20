@@ -593,9 +593,11 @@ type RegionHost = {
     view: Accessor<MountedSession>
     screen: SessionScreen
     tabs: Accessor<StripTabs>
+    side: Accessor<{ opened(): boolean; toggle(): void }>
   }): {
     keys(): readonly string[]
     active(): string | undefined
+    toggle(): void
     entry(key: string): { readonly tab: PanelTab; readonly extension: string; readonly provider: Panel } | undefined
     close(key: string): void
     reopen(): void
@@ -629,6 +631,8 @@ type RegionFixtureState = {
   closed: boolean
   /** How many times the review side panel toggled from a shortcut. */
   reviews: number
+  /** Whether the side region is open. The pane stays mounted either way, so a page keeps its shortcuts. */
+  opened: boolean
   /** How many times the shell's new session shortcut ran. */
   sessions: number
   /** How many browser tabs the pane asked main to open. */
@@ -666,6 +670,7 @@ export function mountBrowserRegion(input: RegionHost) {
       away: false,
       closed: false,
       reviews: 0,
+      opened: true,
       sessions: 0,
       opens: 0,
       reopens: 0,
@@ -960,6 +965,7 @@ export function mountBrowserRegion(input: RegionHost) {
             if (next.length !== all.length || next.some((key, index) => key !== all[index])) setAll(view().key, next)
           },
         }),
+        side: () => ({ opened: () => store.opened, toggle: () => setStore("opened", (opened) => !opened) }),
       })
 
       setSideRegion(() => region)
@@ -1038,7 +1044,10 @@ export function mountBrowserRegion(input: RegionHost) {
           >
             <input.Commands
               close={() => setStore("closed", true)}
-              review={() => setStore("reviews", (count) => count + 1)}
+              review={() => {
+                setStore("reviews", (count) => count + 1)
+                sideRegion()?.toggle()
+              }}
               newSession={() => setStore("sessions", (count) => count + 1)}
               reopenSession={() => setStore("reopens", (count) => count + 1)}
               reopenSide={() => sideRegion()?.reopen()}
@@ -1077,6 +1086,8 @@ export function mountBrowserRegion(input: RegionHost) {
             <p data-testid="tree">{JSON.stringify(tree())}</p>
             <p data-testid="session-state">{store.closed ? "closed" : "open"}</p>
             <p data-testid="review-toggles">{store.reviews}</p>
+            <p data-testid="side-state">{store.opened ? "open" : "closed"}</p>
+            <textarea aria-label="Composer" />
             <p data-testid="new-sessions">{store.sessions}</p>
             <p data-testid="browser-opens">{store.opens}</p>
             <p data-testid="session-reopens">{store.reopens}</p>

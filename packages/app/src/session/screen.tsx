@@ -83,6 +83,7 @@ function SessionScreenContent(props: {
     screen: props.screen,
     tabs: session.layout.tabs,
     closed: attachment.closed,
+    side: () => session.layout.view().side,
     // Closing the last tab closes the side region, which opens with a new tab next time.
     onEmptied: () => {
       if (session.layout.view().side.opened()) session.layout.view().side.toggle()
@@ -365,7 +366,7 @@ function SessionScreenContent(props: {
               onPointerDown={hideTimelineScrollbar}
               onClick={hideTimelineScrollbar}
             >
-              <SessionReviewToggle />
+              <SessionReviewToggle onToggle={region.toggle} />
             </div>
           </Show>
           <div

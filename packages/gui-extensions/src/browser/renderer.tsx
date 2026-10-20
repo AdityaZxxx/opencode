@@ -252,6 +252,12 @@ const setup: Setup<typeof definition> = (ctx) => {
       return url && url !== "about:blank" ? () => model()?.openURL(session, url) : undefined
     },
     focus: (input) => model()?.focusTab(input.session, input.tab.id),
+    // A blank tab starts in its address field, like a browser's new tab.
+    enter: () => {
+      const pane = model()?.pane()
+
+      if (pane?.visible() && !pane.address()) pane.focusAddress()
+    },
   })
 }
 

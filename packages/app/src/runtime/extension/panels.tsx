@@ -113,9 +113,13 @@ export function createRegion(input: {
   screen: SessionScreen
   tabs: Tabs
   closed: ReturnType<typeof createClosedTabs>
+  /** Whether the side region is open, and the user's toggle for it. */
+  side: Accessor<{ opened(): boolean; toggle(): void }>
   /** Runs when a close leaves no stored tab, in the same batch as the close. */
   onEmptied?: () => void
 }) {
+  // The text field focus left when the user opened the side region, which a close from inside it returns to.
+  let returnFocus: HTMLElement | undefined
   const host = useExtensionHost()
   const stored = () => input.tabs().all()
   const providers = createMemo(() => host.items(Panel).filter((item) => item.value.region === input.region))
@@ -324,6 +328,35 @@ export function createRegion(input: {
       stored().flatMap((key) => (key.startsWith(`${extension}:`) ? [key.slice(extension.length + 1)] : [])),
     select(key: string) {
       input.tabs().setActive(key)
+    },
+    /** Opens or closes the side region for the user. Opening moves focus into it; closing gives focus back. */
+    toggle() {
+      const side = input.side()
+      const focused = document.activeElement
+
+      if (side.opened()) {
+        const inside = !!document.getElementById("review-panel")?.contains(focused)
+        const back = returnFocus
+        returnFocus = undefined
+        side.toggle()
+
+        if (inside && back?.isConnected) back.focus({ preventScroll: true })
+
+        return
+      }
+
+      returnFocus =
+        focused instanceof HTMLElement && (focused.isContentEditable || /^(INPUT|TEXTAREA)$/.test(focused.tagName))
+          ? focused
+          : undefined
+      side.toggle()
+      const key = active()
+      const entry = key ? byKey().get(key) : undefined
+
+      if (entry) entry.provider.enter?.(panelInput(input.view, input.screen, { tab: entry.tab }))
+      const root = document.getElementById("review-panel")
+
+      if (root && !root.contains(document.activeElement)) root.focus({ preventScroll: true, focusVisible: false })
     },
     close(key: string) {
       const entry = byKey().get(key)

@@ -428,6 +428,7 @@ export function mountSessionRegion(input: { definitions: readonly Definition[]; 
         remap() {},
       }),
       closed: createClosedTabs(),
+      side: () => ({ opened: () => true, toggle() {} }),
     })
 
     return (

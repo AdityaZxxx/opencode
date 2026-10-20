@@ -7,7 +7,7 @@ import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useSessionLayout } from "@/session/session-layout"
 
-export function SessionReviewToggle() {
+export function SessionReviewToggle(props: { onToggle: () => void }) {
   const command = useCommand()
   const language = useLanguage()
   const { view } = useSessionLayout()
@@ -19,7 +19,7 @@ export function SessionReviewToggle() {
         reviewKeybind: command.keybindParts("review.toggle"),
         reviewVisible: true,
         reviewOpened: view().side.opened(),
-        onReviewToggle: () => view().side.toggle(),
+        onReviewToggle: props.onToggle,
       }}
     />
   )

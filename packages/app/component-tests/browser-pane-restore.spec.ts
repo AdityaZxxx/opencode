@@ -256,6 +256,34 @@ story("keeps in-page shortcuts like ⌘K in the page while forwarding ⌘⇧R an
   await expect(root.getByTestId("session-state")).toHaveText("open")
 })
 
+story(
+  "reopening the side panel focuses a blank tab's address and closing it returns to the composer",
+  async ({ page }) => {
+    const root = page.getByTestId("browser-region-fixture")
+    const mac = await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))
+    const toggle = mac ? "Meta+Shift+r" : "Control+Shift+r"
+    const address = root.getByRole("combobox", { name: "Browser address", exact: true })
+    const composer = root.getByRole("textbox", { name: "Composer", exact: true })
+    const side = root.getByTestId("side-state")
+
+    await expect(root.getByText("Registrations: 1", { exact: true })).toBeVisible()
+    await root.getByRole("button", { name: "Beta", exact: true }).click()
+    await expect(root.getByText("Registrations: 2", { exact: true })).toBeVisible()
+    await root.getByRole("button", { name: "Blank page", exact: true }).click()
+    await expect(root.getByRole("tab", { name: "New tab", exact: true })).toHaveAttribute("aria-selected", "true")
+
+    await composer.focus()
+    await page.keyboard.press(toggle)
+    await expect(side).toHaveText("closed")
+    await page.keyboard.press(toggle)
+    await expect(side).toHaveText("open")
+    await expect(address).toBeFocused()
+    await page.keyboard.press(toggle)
+    await expect(side).toHaveText("closed")
+    await expect(composer).toBeFocused()
+  },
+)
+
 story("opens a browser tab with ⌘T inside the pane and a session everywhere else", async ({ page }) => {
   const root = page.getByTestId("browser-region-fixture")
   const mac = await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))

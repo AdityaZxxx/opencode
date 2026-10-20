@@ -332,6 +332,14 @@ export interface Panel {
       readonly restored: boolean
     },
   ): void
+  /**
+   * Runs when the user opens the side region on this tab with its toggle, once the tab is on screen. Move keyboard
+   * focus to the tab's own target, such as a text field. When focus is still outside the region afterwards, the host
+   * focuses the region itself.
+   *
+   * @param input - The selected tab, routed session and owning screen. Do not destructure.
+   */
+  enter?(input: PanelProps): void
 }
 
 /** A search entry of a `SettingsPage`, indexed without mounting the page. */

@@ -462,7 +462,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       id: "review.toggle",
       title: language.t("command.review.toggle"),
       keybind: "mod+shift+r",
-      onSelect: () => actions.session.layout.view().side.toggle(),
+      onSelect: actions.region.toggle,
     }),
     ...(actions.region.pane("bottom").keys().length > 0
       ? [

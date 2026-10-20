@@ -281,6 +281,12 @@ const setup: Setup<typeof Terminal> = (ctx) => {
 
       if (!input.restored) terminal.requestFocus(pty.id)
     },
+    enter: (input) => {
+      const terminal = model.load(input.session)
+      const pty = terminal.byTab(input.tab.id)
+
+      if (pty) terminal.requestFocus(pty.id)
+    },
   })
 }
 
